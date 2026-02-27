@@ -1,0 +1,1 @@
+Checklist V2.2 — Vérification rapide\nDate: 2026-02-27\n\n- PMS: marquer arrivées/départs + cliquer chambre + enregistrer\n- Tickets: créer et vérifier affichage immédiat\n- Stocks: modifier et enregistrer + refresh\n- Toilettes: log + historique\n- Rework/Audit/L&F: créer + persister\n- Auto-refresh: attendre 15s sur second appareil\n

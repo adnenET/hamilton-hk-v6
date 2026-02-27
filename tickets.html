@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Hamilton HK — Tickets Technique (OPS V5)</title>
+  <style>
+    :root{ --bg:#0b0f14; --card:#111826; --muted:#93a4b8; --text:#e7eef7; --line:#1e2a3b; --pri:#2d73ff;
+      --ok:#7cf2b5; --warn:#ffd48a; --bad:#ff6b7a; }
+    *{ box-sizing:border-box; font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial; }
+    body{ margin:0; background:linear-gradient(180deg,#0b0f14,#070a0f); color:var(--text); }
+    header{ position:sticky; top:0; z-index:20; background:rgba(11,15,20,.9); backdrop-filter: blur(10px); border-bottom:1px solid var(--line); }
+    .wrap{ max-width:1400px; margin:0 auto; padding:12px 16px; }
+    h1{ margin:0; font-size:15px; }
+    .sub{ margin-top:4px; font-size:12px; color:var(--muted); display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .pill{ display:inline-flex; gap:8px; align-items:center; padding:7px 10px; border-radius:999px; border:1px solid var(--line); background:#0b1220; font-size:12px; }
+    .btn{ padding:10px 12px; border-radius:12px; border:1px solid var(--line); background:#0b1220; color:var(--text); cursor:pointer; }
+    .btn.primary{ background:var(--pri); border-color:var(--pri); }
+    .btn.danger{ background:#2a0f18; border-color:#7a2136; }
+    .btn:hover{ filter:brightness(1.06); }
+    .grid{ max-width:1400px; margin:0 auto; padding:16px; display:grid; grid-template-columns: 1fr; gap:12px; }
+    @media(min-width:1100px){ .grid{ grid-template-columns: 420px 1fr; } }
+    .card{ background:rgba(17,24,38,.92); border:1px solid var(--line); border-radius:14px; padding:14px; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+    label{ font-size:12px; color:var(--muted); }
+    input, select, textarea{ width:100%; padding:9px 10px; border-radius:10px; border:1px solid var(--line); background:#0b1220; color:var(--text); outline:none; font-size:12px; }
+    textarea{ min-height:88px; resize:vertical; }
+    .row{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+    .small{ font-size:11px; color:var(--muted); }
+    .table{ width:100%; border-collapse:collapse; overflow:hidden; border-radius:14px; border:1px solid var(--line); }
+    .table th,.table td{ padding:10px 10px; border-bottom:1px solid rgba(30,42,59,.6); vertical-align:top; font-size:12px; }
+    .table th{ text-align:left; color:#cfe0ff; background:#0b1220; }
+    .table tr:last-child td{ border-bottom:none; }
+    .ok{ color:var(--ok);} .warn{ color:var(--warn);} .bad{ color:var(--bad);}
+    .tag{ display:inline-flex; padding:3px 8px; border-radius:999px; border:1px solid var(--line); background:#0b1220; font-size:11px; color:#cfe0ff; }
+    .tag.open{ border-color:#2d73ff; }
+    .tag.progress{ border-color:#ffd48a; color:#ffd48a;}
+    .tag.closed{ border-color:#7cf2b5; color:#7cf2b5;}
+  </style>
+</head>
+<body>
+<header>
+  <div class="wrap" style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
+    <div>
+      <h1>Tickets Technique <span class="pill">OPS V5</span></h1>
+      <div class="sub">
+        <span class="pill">Création + assignation + clôture</span>
+        <span class="pill">Traçabilité agents techniques</span>
+      </div>
+    </div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <button class="btn" id="btnPMS">PMS</button>
+      <button class="btn" id="btnDash">Dashboard</button>
+      <button class="btn" id="btnTech">Staff technique</button>
+      <button class="btn primary" id="btnWhatsOpen">WhatsApp — tickets ouverts</button>
+    </div>
+  </div>
+</header>
+
+<div class="grid">
+  <section class="card">
+    <div class="small" id="statusMsg"></div>
+    <div style="margin-top:10px; font-weight:800;">Nouveau / Modifier ticket</div>
+
+    <div class="row" style="margin-top:10px;">
+      <div><label>Room</label><input id="room" placeholder="ex: 214"></div>
+      <div><label>Priorité</label><select id="priority"><option value="Normal">Normal</option><option value="Urgent">Urgent</option><option value="Critique">Critique</option></select></div>
+    </div>
+
+    <div class="row" style="margin-top:10px;">
+      <div><label>Catégorie</label>
+        <select id="category">
+          <option value="Plomberie">Plomberie</option>
+          <option value="Clim/Chauffage">Clim/Chauffage</option>
+          <option value="Électricité">Électricité</option>
+          <option value="TV/Internet">TV/Internet</option>
+          <option value="Menuiserie">Menuiserie</option>
+          <option value="Autre" selected>Autre</option>
+        </select>
+      </div>
+      <div><label>Assigné à</label><select id="assigned"></select></div>
+    </div>
+
+    <div style="margin-top:10px;">
+      <label>Description (ce qui est constaté)</label>
+      <textarea id="desc" placeholder="Ex: fuite sous lavabo / clim ne refroidit pas / prise HS..."></textarea>
+    </div>
+
+    <div class="row" style="margin-top:10px;">
+      <div><label>Statut</label>
+        <select id="status">
+          <option value="OPEN" selected>Ouvert</option>
+          <option value="IN_PROGRESS">En cours</option>
+          <option value="DONE">Terminé</option>
+        </select>
+      </div>
+      <div><label>Créé par</label>
+        <select id="created_by">
+          <option value="Gouv" selected>Gouvernante</option>
+          <option value="FC">F.C</option>
+          <option value="Réception">Réception</option>
+          <option value="Autre">Autre</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="margin-top:10px;">
+      <label>Résolution / Commentaire technique (si terminé)</label>
+      <textarea id="resolution" placeholder="Ex: siphon remplacé / disjoncteur réarmé / filtre nettoyé..."></textarea>
+    </div>
+
+    <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
+      <button class="btn primary" id="btnSave">Sauver ticket</button>
+      <button class="btn" id="btnNew">Nouveau</button>
+      <button class="btn danger" id="btnDelete">Supprimer</button>
+      <button class="btn" id="btnWhatsOne">WhatsApp — ce ticket</button>
+    </div>
+    <div class="small" style="margin-top:8px;">Astuce: tu peux créer un ticket depuis PMS (bouton “Ticket technique”).</div>
+  </section>
+
+  <section class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+      <div>
+        <div style="font-weight:800;">Liste tickets</div>
+        <div class="small">Filtre par statut / agent / room.</div>
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <select id="f_status">
+          <option value="ALL" selected>Tous</option>
+          <option value="OPEN">Ouverts</option>
+          <option value="IN_PROGRESS">En cours</option>
+          <option value="DONE">Terminés</option>
+        </select>
+        <select id="f_agent"><option value="ALL" selected>Tous agents</option></select>
+        <input id="f_room" placeholder="Room">
+      </div>
+    </div>
+
+    <div style="margin-top:12px; overflow:auto;">
+      <table class="table">
+        <thead><tr>
+          <th>ID</th><th>Room</th><th>Catégorie</th><th>Priorité</th><th>Assigné</th><th>Statut</th><th>Créé</th><th>Action</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<script>
+const $=(id)=>document.getElementById(id);
+const LS_TOKEN="hk_token_v5", LS_API="hk_api_url_v5";
+function defaultApiUrl(){
+  const u=new URL(window.location.href);
+  const path=u.pathname.replace(/\/tickets\.html$/, "/").replace(/\/$/,"/");
+  u.pathname=path+"api/api.php"; u.search=""; return u.toString();
+}
+function getToken(){ return localStorage.getItem(LS_TOKEN)||""; }
+function getApiUrl(){ return localStorage.getItem(LS_API)||defaultApiUrl(); }
+async function api(action, body=null){
+  const url=new URL(getApiUrl()); url.searchParams.set("action", action);
+  const headers={"Content-Type":"application/json"}; const t=getToken(); if(t) headers["X-Auth-Token"]=t;
+  const res=await fetch(url.toString(), {method: body?"POST":"GET", headers, body: body?JSON.stringify(body):undefined});
+  const j=await res.json().catch(()=>null); if(!j||!j.ok) throw new Error(j&&j.error?j.error:"API error"); return j.data;
+}
+function wa(text, phone=""){
+  const base = phone ? `https://wa.me/${phone.replace(/\D/g,"")}` : "https://wa.me/";
+  const url = base + "?text=" + encodeURIComponent(text);
+  window.open(url, "_blank");
+}
+function tag(st){
+  if(st==="DONE") return '<span class="tag closed">DONE</span>';
+  if(st==="IN_PROGRESS") return '<span class="tag progress">IN PROG</span>';
+  return '<span class="tag open">OPEN</span>';
+}
+const S={ tickets:[], tech:null, selected:null };
+
+function techLabel(t){
+  const n=(t.name||"").trim();
+  return `${t.id}${n? " — "+n:""}`;
+}
+
+function fillTech(){
+  const sel=$("assigned"); sel.innerHTML='<option value="">—</option>';
+  const f=$("f_agent"); f.innerHTML='<option value="ALL" selected>Tous agents</option>';
+  (S.tech.staff||[]).filter(x=>x.active!==false).forEach(t=>{
+    const o=document.createElement("option"); o.value=t.id; o.textContent=techLabel(t); sel.appendChild(o);
+    const o2=document.createElement("option"); o2.value=t.id; o2.textContent=techLabel(t); f.appendChild(o2);
+  });
+}
+
+function clearForm(){
+  S.selected=null;
+  $("room").value=""; $("priority").value="Normal"; $("category").value="Autre";
+  $("assigned").value=""; $("desc").value=""; $("status").value="OPEN";
+  $("created_by").value="Gouv"; $("resolution").value="";
+  $("btnDelete").disabled=true;
+}
+
+function loadIntoForm(t){
+  S.selected=t;
+  $("room").value=t.room||"";
+  $("priority").value=t.priority||"Normal";
+  $("category").value=t.category||"Autre";
+  $("assigned").value=t.assigned_to||"";
+  $("desc").value=t.description||"";
+  $("status").value=t.status||"OPEN";
+  $("created_by").value=t.created_by||"Gouv";
+  $("resolution").value=t.resolution||"";
+  $("btnDelete").disabled=false;
+}
+
+function collectTicket(){
+  const now = new Date().toISOString();
+  const t = S.selected ? {...S.selected} : {};
+  t.room = ($("room").value||"").trim();
+  t.priority = $("priority").value;
+  t.category = $("category").value;
+  t.assigned_to = $("assigned").value || "";
+  t.description = ($("desc").value||"").trim();
+  t.status = $("status").value;
+  t.created_by = $("created_by").value;
+  t.resolution = ($("resolution").value||"").trim();
+  if(!t.created_at) t.created_at = now;
+  t.updated_at = now;
+  if(t.status==="DONE" && !t.closed_at) t.closed_at = now;
+  if(t.status!=="DONE") t.closed_at = "";
+  return t;
+}
+
+function matchesFilters(t){
+  const fs=$("f_status").value;
+  const fa=$("f_agent").value;
+  const fr=($("f_room").value||"").trim();
+  if(fs!=="ALL" && t.status!==fs) return false;
+  if(fa!=="ALL" && (t.assigned_to||"")!==fa) return false;
+  if(fr && (t.room||"")!==fr) return false;
+  return true;
+}
+
+function renderTable(){
+  const tbody=$("tbody"); tbody.innerHTML="";
+  const list=S.tickets.filter(matchesFilters);
+  if(!list.length){
+    const tr=document.createElement("tr"); tr.innerHTML=`<td colspan="8" class="small">Aucun ticket.</td>`;
+    tbody.appendChild(tr); return;
+  }
+  list.forEach(t=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML=`
+      <td><b>${t.id||""}</b></td>
+      <td>${t.room||""}</td>
+      <td>${t.category||""}</td>
+      <td>${t.priority||""}</td>
+      <td>${t.assigned_to||"—"}</td>
+      <td>${tag(t.status||"OPEN")}</td>
+      <td>${(t.created_at||"").slice(0,16).replace("T"," ")}</td>
+      <td><button class="btn" data-open="${t.id}">Ouvrir</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+  tbody.querySelectorAll("[data-open]").forEach(b=>{
+    b.addEventListener("click", ()=>{
+      const id=b.dataset.open;
+      const t=S.tickets.find(x=>x.id===id);
+      if(t) loadIntoForm(t);
+    });
+  });
+}
+
+function formatTicket(t){
+  const lines=[];
+  lines.push(`🛠️ TICKET TECHNIQUE — ${t.id||""}`);
+  lines.push(`Room: ${t.room||"-"} | Priorité: ${t.priority||"-"} | Cat: ${t.category||"-"}`);
+  lines.push(`Statut: ${t.status||"OPEN"} | Assigné: ${t.assigned_to||"-"} | Créé par: ${t.created_by||"-"}`);
+  lines.push(`Desc: ${t.description||"-"}`);
+  if(t.resolution) lines.push(`Résolution: ${t.resolution}`);
+  return lines.join("\n");
+}
+
+function formatOpenTickets(){
+  const open=S.tickets.filter(t=>t.status!=="DONE");
+  if(!open.length) return "✅ Aucun ticket technique ouvert.";
+  const lines=["🛠️ TICKETS TECHNIQUES OUVERTS"];
+  open.slice(0,50).forEach(t=>{
+    lines.push(`• ${t.id} | Room ${t.room||"-"} | ${t.priority||""} | ${t.category||""} | ${t.assigned_to||"—"} | ${t.status}`);
+  });
+  if(open.length>50) lines.push(`… (+${open.length-50})`);
+  return lines.join("\n");
+}
+
+async function loadAll(){
+  try{
+    S.tech = await api("get_tech_roster");
+    const tk = await api("get_tickets");
+    S.tickets = tk.tickets || [];
+    $("statusMsg").innerHTML = `<span class="ok">✅ API connectée</span>`;
+  }catch(e){
+    $("statusMsg").innerHTML = `<span class="warn">⚠️ API non dispo. Utilise serveur (XAMPP/cPanel) pour traçabilité.</span>`;
+    S.tech={staff:[]}; S.tickets=[];
+  }
+  fillTech();
+  clearForm();
+  renderTable();
+  // prefill from query ?room=&issue=
+  const url=new URL(window.location.href);
+  const room=url.searchParams.get("room"); const issue=url.searchParams.get("issue"); const by=url.searchParams.get("by");
+  if(room) $("room").value=room;
+  if(issue) $("desc").value=issue;
+  if(by) $("created_by").value=by;
+}
+
+$("btnPMS").addEventListener("click", ()=>{ window.location.href="index.html"; });
+$("btnDash").addEventListener("click", ()=>{ window.location.href="dashboard.html"; });
+$("btnTech").addEventListener("click", ()=>{ window.location.href="tech_staff.html"; });
+$("btnNew").addEventListener("click", clearForm);
+$("btnSave").addEventListener("click", async ()=>{
+  const t=collectTicket();
+  try{
+    const saved=await api("save_ticket", {ticket:t});
+    // refresh
+    const tk = await api("get_tickets");
+    S.tickets = tk.tickets || [];
+    loadIntoForm(saved);
+    renderTable();
+    $("statusMsg").innerHTML = `<span class="ok">✅ Ticket sauvegardé</span>`;
+  }catch(e){
+    $("statusMsg").innerHTML = `<span class="warn">⚠️ Sauvegarde impossible</span>`;
+  }
+});
+$("btnDelete").addEventListener("click", async ()=>{
+  if(!S.selected || !S.selected.id) return;
+  try{
+    await api("delete_ticket", {id:S.selected.id});
+    const tk = await api("get_tickets");
+    S.tickets = tk.tickets || [];
+    clearForm();
+    renderTable();
+    $("statusMsg").innerHTML = `<span class="ok">✅ Ticket supprimé</span>`;
+  }catch(e){
+    $("statusMsg").innerHTML = `<span class="warn">⚠️ Suppression impossible</span>`;
+  }
+});
+$("btnWhatsOne").addEventListener("click", ()=>{
+  const t=collectTicket();
+  wa(formatTicket(t));
+});
+$("btnWhatsOpen").addEventListener("click", ()=>{
+  wa(formatOpenTickets());
+});
+
+$("f_status").addEventListener("change", renderTable);
+$("f_agent").addEventListener("change", renderTable);
+$("f_room").addEventListener("input", renderTable);
+
+loadAll();
+</script>
+</body>
+</html>

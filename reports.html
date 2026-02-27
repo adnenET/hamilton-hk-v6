@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Hamilton HK — Rapports F.C (V5 FINAL)</title>
+  <style>
+    :root{ --bg:#0b0f14; --card:#111826; --muted:#93a4b8; --text:#e7eef7; --line:#1e2a3b; --pri:#2d73ff; }
+    *{ box-sizing:border-box; font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial; }
+    body{ margin:0; background:linear-gradient(180deg,#0b0f14,#070a0f); color:var(--text); }
+    header{ position:sticky; top:0; z-index:20; background:rgba(11,15,20,.9); backdrop-filter: blur(10px); border-bottom:1px solid var(--line); }
+    .wrap{ max-width:1200px; margin:0 auto; padding:12px 16px; }
+    h1{ margin:0; font-size:15px; }
+    .sub{ margin-top:4px; font-size:12px; color:var(--muted); display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .pill{ display:inline-flex; gap:8px; align-items:center; padding:7px 10px; border-radius:999px; border:1px solid var(--line); background:#0b1220; font-size:12px; }
+    .btn{ padding:10px 12px; border-radius:12px; border:1px solid var(--line); background:#0b1220; color:var(--text); cursor:pointer; }
+    .btn.primary{ background:var(--pri); border-color:var(--pri); }
+    .btn:hover{ filter:brightness(1.06); }
+    .grid{ max-width:1200px; margin:0 auto; padding:16px; display:grid; grid-template-columns: 1fr; gap:12px; }
+    .card{ background:rgba(17,24,38,.92); border:1px solid var(--line); border-radius:14px; padding:14px; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+    label{ font-size:12px; color:var(--muted); }
+    input, select{ width:100%; padding:9px 10px; border-radius:10px; border:1px solid var(--line); background:#0b1220; color:var(--text); outline:none; font-size:12px; }
+    .row{ display:grid; grid-template-columns: 1fr 220px; gap:10px; align-items:center; padding:6px 0; border-bottom:1px dashed rgba(30,42,59,.55); }
+    .row:last-child{ border-bottom:none; }
+    .small{ font-size:11px; color:var(--muted); }
+    .table{ width:100%; border-collapse:collapse; overflow:hidden; border-radius:14px; border:1px solid var(--line); }
+    .table th,.table td{ padding:10px 10px; border-bottom:1px solid rgba(30,42,59,.6); vertical-align:top; font-size:12px; }
+    .table th{ text-align:left; color:#cfe0ff; background:#0b1220; }
+    .table tr:last-child td{ border-bottom:none; }
+    .kpis{ display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+    .pill2{ display:inline-flex; gap:8px; align-items:center; padding:7px 10px; border-radius:14px; border:1px solid var(--line); background:#0b1220; font-size:12px; }
+    .ok{ color:#7cf2b5; } .warn{ color:#ffd48a; }
+    @media print{ header, .no-print{ display:none !important; } body{ background:#fff; color:#000; } .card{ box-shadow:none; background:#fff; border:1px solid #ddd; border-radius:0; } .table{ border:1px solid #ddd; } .table th{ background:#f3f3f3; color:#000; } }
+    .print-page{ display:none; }
+    @media print{ .print-page{ display:block; page-break-after: always; padding:18px; } .print-h{ font-size:18px; font-weight:800; margin-bottom:8px; } .print-sub{ font-size:12px; margin-bottom:10px; color:#000; } .print-box{ border:1px solid #ddd; padding:10px; border-radius:10px; margin-top:10px; } .print-row{ margin:3px 0; } }
+  </style>
+</head>
+<body>
+<header class="no-print">
+  <div class="wrap" style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
+    <div>
+      <h1>Hamilton HK — Rapports F.C <span class="pill">V5 FINAL</span></h1>
+      <div class="sub">
+        <span class="pill">Prévisualisation avant impression</span>
+        <span class="pill">Historique 7 jours + Mensuel</span>
+      </div>
+    </div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <button class="btn" id="btnBack">← Retour PMS</button>
+      <button class="btn" id="btnDash">Dashboard</button>
+      <button class="btn" id="btnMaint">Maintenance</button>
+      <button class="btn primary" id="btnPrintFC">Imprimer rapport F.C</button>
+      <button class="btn" id="btnPrintGov">Imprimer synthèse gouv</button>
+    </div>
+  </div>
+</header>
+
+<div class="grid">
+  <section class="card">
+    <div class="row"><label>Date (pour charger le dispatch du jour)</label><input id="date" type="date"></div>
+    <div class="row"><label>Femme de chambre</label><select id="staffSel"></select></div>
+    <div class="row"><label>Période historique</label><select id="periodSel"><option value="7">7 jours</option><option value="30" selected>30 jours</option><option value="90">90 jours</option><option value="ALL">Tout</option></select></div>
+    <div class="small" id="statusMsg" style="margin-top:8px;"></div>
+  </section>
+
+  <section class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+      <div>
+        <div style="font-weight:800; font-size:14px;" id="title">Rapport F.C</div>
+        <div class="small" id="subtitle"></div>
+      </div>
+      <div class="kpis" id="kpis"></div>
+    </div>
+
+    <div style="margin-top:12px; overflow:auto;">
+      <table class="table">
+        <thead><tr><th>Catégorie</th><th>Chambres</th></tr></thead>
+        <tbody id="roomsBy"></tbody>
+      </table>
+    </div>
+
+    <div style="margin-top:14px;">
+      <div style="font-weight:800; font-size:13px; color:#d7e6ff;">Historique (période sélectionnée)</div>
+      <div class="small">Minutes assignées et note qualité (si renseignée).</div>
+      <div style="margin-top:10px; overflow:auto;">
+        <table class="table">
+          <thead><tr><th>Date</th><th>Shift</th><th>Min</th><th>Qualité (/10)</th></tr></thead>
+          <tbody id="hist7"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div id="printArea" style="display:none;"></div>
+
+<script>
+const $ = (id)=>document.getElementById(id);
+const LS_TOKEN="hk_token_v5", LS_API="hk_api_url_v5";
+function isoToday(){ return new Date().toISOString().slice(0,10); }
+function defaultApiUrl(){
+  const u=new URL(window.location.href);
+  const path=u.pathname.replace(/\/reports\.html$/, "/").replace(/\/$/,"/");
+  u.pathname=path+"api/api.php"; u.search=""; return u.toString();
+}
+function getToken(){ return localStorage.getItem(LS_TOKEN)||""; }
+function getApiUrl(){ return localStorage.getItem(LS_API)||defaultApiUrl(); }
+async function api(action, body=null){
+  const url=new URL(getApiUrl()); url.searchParams.set("action", action);
+  const headers={"Content-Type":"application/json"}; const token=getToken(); if(token) headers["X-Auth-Token"]=token;
+  const res=await fetch(url.toString(), {method: body?"POST":"GET", headers, body: body?JSON.stringify(body):undefined});
+  const j=await res.json().catch(()=>null); if(!j||!j.ok) throw new Error(j&&j.error?j.error:"API error"); return j.data;
+}
+
+const S={ roster:null, history:null, perf:null, cur:null, settings:null, selectedId:"" };
+
+function staffLabel(st){ 
+  const name = (st.name||"").trim();
+  const extra = st.is_extra ? " (Extra)" : "";
+  return `${st.id}${name? " — "+name:""}${extra}`;
+}
+
+function renderStaffSel(){
+  const sel=$("staffSel"); sel.innerHTML="";
+  (S.roster.staff||[]).filter(s=>s.active!==false && (s.role||"FC")==="FC").forEach(s=>{
+    const o=document.createElement("option"); o.value=s.id; o.textContent=staffLabel(s); sel.appendChild(o);
+  });
+  if(!sel.value && sel.options.length) sel.value = sel.options[0].value;
+  S.selectedId = sel.value;
+}
+
+function getDayAssignments(date){ 
+  const d = (S.history.days||[]).filter(x=>x.date===date).sort((a,b)=> (a.shift||"").localeCompare(b.shift||""))[0];
+  return d || null;
+}
+
+function lastRows(id, refDate){
+  const base=new Date(refDate+"T00:00:00");
+  const days=[];
+  const p = $("periodSel").value;
+  const n = (p==="ALL") ? 20000 : parseInt(p||"30",10);
+  for(let i=0;i<n;i++){ const d=new Date(base); d.setDate(base.getDate()-i); days.push(d.toISOString().slice(0,10)); }
+  const rows=[];
+  (S.history.days||[]).forEach(d=>{
+    if(!days.includes(d.date)) return;
+    const min = d.assignments && d.assignments[id] ? (d.assignments[id].minutes||0) : 0;
+    const q = d.quality && d.quality[id] ? d.quality[id] : "";
+    if(min>0 || q!=="") rows.push({date:d.date, shift:d.shift||"", min:Math.round(min), q});
+  });
+  rows.sort((a,b)=> b.date.localeCompare(a.date));
+  return rows;
+}
+
+function monthStats(id, yyyymm){
+  const ps = S.perf.staff && S.perf.staff[id] && S.perf.staff[id].month && S.perf.staff[id].month[yyyymm];
+  if(!ps) return {assigned_min:0, quality_avg:"—", quality_n:0};
+  const avg = ps.quality_n ? Math.round((ps.quality_sum/ps.quality_n)*10)/10 : "—";
+  return {assigned_min: Math.round(ps.assigned_min||0), quality_avg: avg, quality_n: ps.quality_n||0};
+}
+
+function renderKpis(minToday, roomsToday){
+  const wrap=$("kpis"); wrap.innerHTML="";
+  const mk=(label,val)=>{ const d=document.createElement("div"); d.className="pill2"; d.innerHTML=`<span class="small">${label}</span> <b style="margin-left:6px;">${val}</b>`; return d; };
+  const month = ($("date").value||isoToday()).slice(0,7);
+  const ms = monthStats(S.selectedId, month);
+  wrap.appendChild(mk("Min (jour)", minToday));
+  wrap.appendChild(mk("Chambres (jour)", roomsToday));
+  wrap.appendChild(mk("Coef actuel", (S.perf.staff && S.perf.staff[S.selectedId]) ? (Math.round((S.perf.staff[S.selectedId].coef||1)*100)/100) : "1.00"));
+  wrap.appendChild(mk("Min (mois)", ms.assigned_min));
+  wrap.appendChild(mk("Qualité (mois)", ms.quality_avg));
+}
+
+function renderRoomsBy(assign){
+  const tbody=$("roomsBy"); tbody.innerHTML="";
+  const id=S.selectedId;
+  const a = assign && assign.assignments && assign.assignments[id] ? assign.assignments[id] : null;
+  const list = a ? (a.rooms||[]) : [];
+  // We don't have category split stored; derive from roomStates if available.
+  const states = assign && assign.roomStates ? assign.roomStates : {};
+  const by={RELOCATION:[],ARRIVAL:[],DEPARTURE:[],OCCUPIED:[],VACANT_DIRTY:[]};
+  list.forEach(r=>{
+    const st = states[r]?.status || "OCCUPIED";
+    if(!by[st]) by[st]=[];
+    by[st].push(r);
+  });
+  const order=[["RELOCATION","Délogements"],["ARRIVAL","Arrivées"],["DEPARTURE","Départs"],["VACANT_DIRTY","Libre sale"],["OCCUPIED","Recouches/Occupées"]];
+  order.forEach(([k,label])=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td><b>${label}</b></td><td>${(by[k]||[]).join(", ") || "—"}</td>`;
+    tbody.appendChild(tr);
+  });
+  const minToday = a ? Math.round(a.minutes||0) : 0;
+  renderKpis(minToday, list.length);
+}
+
+function renderHist7(){
+  const tbody=$("hist7"); tbody.innerHTML="";
+  const rows=lastRows(S.selectedId, $("date").value||isoToday());
+  if(!rows.length){
+    const tr=document.createElement("tr"); tr.innerHTML=`<td colspan="4" class="small">Aucun historique sur la période sélectionnée.</td>`;
+    tbody.appendChild(tr); return;
+  }
+  rows.forEach(r=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML = `<td>${r.date}</td><td>${r.shift}</td><td><b>${r.min}</b></td><td>${r.q===""?"—":r.q}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function refresh(){
+  const date=$("date").value||isoToday();
+  const staff = (S.roster.staff||[]).find(x=>x.id===S.selectedId) || {id:S.selectedId,name:""};
+  $("title").textContent = `Rapport F.C — ${staffLabel(staff)}`;
+  const assign = getDayAssignments(date);
+  $("subtitle").textContent = assign ? `Dispatch chargé depuis l'historique (date: ${date}, shift: ${assign.shift||"Day"})` : `Aucun dispatch enregistré pour ${date}. (Utilise "Enregistrer fin de journée" sur la page PMS)`;
+  renderRoomsBy(assign);
+  renderHist7();
+}
+
+function buildPrintFC(){
+  const date=$("date").value||isoToday();
+  const staff = (S.roster.staff||[]).find(x=>x.id===S.selectedId) || {id:S.selectedId,name:""};
+  const assign = getDayAssignments(date);
+  const a = assign && assign.assignments && assign.assignments[S.selectedId] ? assign.assignments[S.selectedId] : {minutes:0,rooms:[]};
+  const states = assign && assign.roomStates ? assign.roomStates : {};
+  const by={RELOCATION:[],ARRIVAL:[],DEPARTURE:[],VACANT_DIRTY:[],OCCUPIED:[]};
+  (a.rooms||[]).forEach(r=>{ const st=states[r]?.status || "OCCUPIED"; if(!by[st]) by[st]=[]; by[st].push(r); });
+  const checkin = S.settings.shift?.checkin_time || "14:00";
+  const html = `
+    <div class="print-page">
+      <div class="print-h">DISPATCH F.C — ${staff.id}</div>
+      <div class="print-sub">Nom: ${(staff.name||"").trim()||"________"} · Date: ${date} · Check-in: ${checkin}</div>
+      <div class="print-box"><div class="print-row"><b>Minutes totales:</b> ${Math.round(a.minutes||0)} · <b>Chambres:</b> ${(a.rooms||[]).length}</div>
+      <div class="print-row"><b>Plan estimé:</b> 08:00–${checkin} → Arrivées/Délogements · ${checkin}–fin → Départs/Recouches</div></div>
+      <div class="print-box"><div class="print-row"><b>Délogements</b></div><div class="print-row">${(by.RELOCATION||[]).join(", ")||"—"}</div>
+      <div class="print-row" style="margin-top:8px;"><b>Arrivées</b></div><div class="print-row">${(by.ARRIVAL||[]).join(", ")||"—"}</div>
+      <div class="print-row" style="margin-top:8px;"><b>Départs</b></div><div class="print-row">${(by.DEPARTURE||[]).join(", ")||"—"}</div>
+      <div class="print-row" style="margin-top:8px;"><b>Libre sale / Occupées</b></div><div class="print-row">${((by.VACANT_DIRTY||[]).concat(by.OCCUPIED||[])).join(", ")||"—"}</div></div>
+      <div class="print-box"><div class="print-row"><b>Contrôle gouvernante:</b> _______________________</div>
+      <div class="print-row"><b>Signature F.C:</b> _____________________________</div></div>
+    </div>`;
+  const area=$("printArea"); area.innerHTML=html; area.style.display="block";
+  window.print();
+  area.style.display="none";
+}
+
+function buildPrintGov(){
+  const date=$("date").value||isoToday();
+  const assign = getDayAssignments(date);
+  const staffList = (S.roster.staff||[]).filter(s=>s.active!==false && (s.role||"FC")==="FC");
+  const rows = staffList.map(s=>{
+    const a = assign && assign.assignments && assign.assignments[s.id] ? assign.assignments[s.id] : null;
+    return {id:s.id, name:(s.name||""), min: a?Math.round(a.minutes||0):0, rooms:a?(a.rooms||[]).length:0};
+  }).filter(r=>r.min>0 || r.rooms>0).sort((a,b)=>b.min-a.min);
+  const checkin=S.settings.shift?.checkin_time || "14:00";
+  let tr = rows.map(r=>`<tr><td><b>${r.id}</b></td><td>${r.name||""}</td><td><b>${r.min}</b></td><td>${r.rooms}</td></tr>`).join("");
+  if(!tr) tr = `<tr><td colspan="4">—</td></tr>`;
+  const html = `
+    <div class="print-page">
+      <div class="print-h">SYNTHÈSE DISPATCH — Gouvernante</div>
+      <div class="print-sub">Date: ${date} · Check-in: ${checkin}</div>
+      <div class="print-box">
+        <table class="table" style="border:1px solid #ddd;">
+          <thead><tr><th>Matricule</th><th>Nom</th><th>Minutes</th><th>Chambres</th></tr></thead>
+          <tbody>${tr}</tbody>
+        </table>
+      </div>
+      <div class="print-box"><div class="print-row">Signature: _______________________</div></div>
+    </div>`;
+  const area=$("printArea"); area.innerHTML=html; area.style.display="block";
+  window.print();
+  area.style.display="none";
+}
+
+async function loadAll(){
+  $("date").value = isoToday();
+  try{
+    S.settings = await api("get_settings");
+    S.roster = await api("get_roster");
+    S.history = await api("get_history");
+    S.perf = await api("get_performance");
+    $("statusMsg").innerHTML = `<span class="ok">✅ API connectée</span>`;
+  }catch(e){
+    $("statusMsg").innerHTML = `<span class="warn">⚠️ API non disponible : rapports limités (pas d'historique partagé). Utilise XAMPP / serveur.</span>`;
+    S.settings = {shift:{checkin_time:"14:00"}};
+    S.roster = {staff: Array.from({length:11},(_,i)=>({id:String(i+1).padStart(2,"0"),name:"",role:"FC",active:true,is_extra:false,base_coef:1.0}))};
+    S.history = {days:[]};
+    S.perf = {staff:{}};
+  }
+  renderStaffSel();
+  refresh();
+}
+
+$("btnBack").addEventListener("click", ()=>{ window.location.href="index.html"; });
+$("btnDash").addEventListener("click", ()=>{ window.location.href="dashboard.html"; });
+$("btnMaint").addEventListener("click", ()=>{ window.location.href="maintenance.html"; });
+$("staffSel").addEventListener("change", ()=>{ S.selectedId=$("staffSel").value; refresh(); });
+$("periodSel").addEventListener("change", refresh);
+$("date").addEventListener("change", refresh);
+$("btnPrintFC").addEventListener("click", buildPrintFC);
+$("btnPrintGov").addEventListener("click", buildPrintGov);
+
+loadAll();
+</script>
+</body>
+</html>

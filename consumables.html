@@ -1,0 +1,28 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Consommables</title>
+<style>body{font-family:system-ui;margin:0;background:#0b0f14;color:#e7eef7}header{padding:12px 16px;border-bottom:1px solid #1e2a3b;position:sticky;top:0;background:#0b0f14}
+button{padding:10px 12px;border-radius:12px;border:1px solid #1e2a3b;background:#0b1220;color:#e7eef7;cursor:pointer}
+main{max-width:1200px;margin:0 auto;padding:16px}
+.card{border:1px solid #1e2a3b;border-radius:14px;padding:14px;background:#111826}
+input{width:100%;padding:8px;border-radius:10px;border:1px solid #1e2a3b;background:#0b1220;color:#e7eef7}
+table{width:100%;border-collapse:collapse}th,td{padding:8px;border-bottom:1px solid #1e2a3b;font-size:12px;text-align:left}</style></head>
+<body><header><b>Consommables (par étage)</b> — <button onclick="location.href='dashboard.html'">Dashboard</button> <button onclick="location.href='index.html'">PMS</button>
+<button id="save" style="background:#2d73ff;border-color:#2d73ff">Save</button> <button onclick="window.print()">Print</button> <button id="w">WhatsApp</button> <span id="s" style="opacity:.7;margin-left:8px"></span></header>
+<main><section class="card"><div style="overflow:auto"><table id="t"></table></div></section></main>
+<script>
+const $=id=>document.getElementById(id); const LS_API="hk_api_url_v5";
+const apiUrl=()=>localStorage.getItem(LS_API)||new URL("api/api.php",location.href).toString();
+async function api(action,body=null){const u=new URL(apiUrl());u.searchParams.set("action",action);
+const r=await fetch(u,{method:body?"POST":"GET",headers:{"Content-Type":"application/json"},body:body?JSON.stringify(body):undefined});
+const j=await r.json().catch(()=>null); if(!j||!j.ok) throw new Error(j&&j.error?j.error:"API"); return j.data;}
+let cons={floors:{},items:["Serviettes bain","Serviettes main","Draps","Amenities","Papier toilette"]};
+function ensureFloors(){for(let f=1;f<=7;f++){const k=String(f); if(!cons.floors[k]) cons.floors[k]={}; cons.items.forEach(it=>{if(cons.floors[k][it]==null) cons.floors[k][it]=0;});}}
+function render(){ensureFloors(); const floors=Object.keys(cons.floors).sort(); let h="<thead><tr><th>Item</th>"+floors.map(f=>`<th>Étage ${f}</th>`).join("")+"</tr></thead><tbody>";
+cons.items.forEach(it=>{h+=`<tr><td><b>${it}</b></td>`+floors.map(f=>`<td><input data-f="${f}" data-i="${it}" value="${cons.floors[f][it]||0}" inputmode="numeric"></td>`).join("")+"</tr>";});
+h+="</tbody>"; $("t").innerHTML=h;}
+function read(){document.querySelectorAll("input[data-f]").forEach(inp=>{const f=inp.dataset.f,it=inp.dataset.i; const n=parseInt(inp.value||"0",10); cons.floors[f][it]=isNaN(n)?0:n;});}
+function wa(){ensureFloors(); const floors=Object.keys(cons.floors).sort(); let t=["🧻 Consommables — ruptures (0)"]; floors.forEach(f=>{let z=[]; cons.items.forEach(it=>{if((cons.floors[f][it]||0)<=0) z.push(it);}); if(z.length) t.push(`Étage ${f}: `+z.join(", "));}); return t.join("\n");}
+async function load(){try{const d=await api("get_consumables"); if(d) cons=d; $("s").textContent="✅ API OK";}catch(e){$("s").textContent="⚠️ API";} render();}
+$("save").onclick=async()=>{try{read(); await api("save_consumables",{consumables:cons}); $("s").textContent="✅ Saved";}catch(e){$("s").textContent="⚠️ Save";}}
+$("w").onclick=()=>window.open("https://wa.me/?text="+encodeURIComponent(wa()),"_blank");
+load();
+</script></body></html>

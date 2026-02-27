@@ -1,0 +1,45 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Lost & Found</title>
+<style>body{font-family:system-ui;margin:0;background:#0b0f14;color:#e7eef7}header{padding:12px 16px;border-bottom:1px solid #1e2a3b;position:sticky;top:0;background:#0b0f14}
+button{padding:10px 12px;border-radius:12px;border:1px solid #1e2a3b;background:#0b1220;color:#e7eef7;cursor:pointer}
+main{max-width:1200px;margin:0 auto;padding:16px;display:grid;grid-template-columns:360px 1fr;gap:12px}
+@media(max-width:900px){main{grid-template-columns:1fr}}
+.card{border:1px solid #1e2a3b;border-radius:14px;padding:14px;background:#111826}
+input,select,textarea{width:100%;padding:9px 10px;border-radius:10px;border:1px solid #1e2a3b;background:#0b1220;color:#e7eef7}
+table{width:100%;border-collapse:collapse}th,td{padding:8px;border-bottom:1px solid #1e2a3b;font-size:12px;text-align:left}</style></head>
+<body><header><b>Lost & Found</b> — <button onclick="location.href='index.html'">PMS</button> <button onclick="location.href='dashboard.html'">Dashboard</button>
+<button id="w">WhatsApp</button> <button onclick="window.print()">Print</button> <span id="s" style="opacity:.7;margin-left:8px"></span></header>
+<main>
+<section class="card"><b>Nouvel objet</b>
+<div style="margin-top:10px"><label>Room</label><input id="room" placeholder="324"></div>
+<div style="margin-top:10px"><label>Description</label><input id="desc" placeholder="AirPods, montre..."></div>
+<div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+<div><label>Où stocké</label><input id="where" placeholder="coffre réception"></div>
+<div><label>Qui</label><input id="by" placeholder="FC03"></div></div>
+<div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+<div><label>Statut</label><select id="st"><option selected>STORED</option><option>RETURNED</option></select></div>
+<div><label>Note</label><input id="note"></div></div>
+<div style="margin-top:10px"><button id="add" style="background:#2d73ff;border-color:#2d73ff">Ajouter</button></div></section>
+<section class="card"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center">
+<div><b>Historique</b></div>
+<div style="display:flex;gap:8px"><select id="f"><option value="ALL">Tous</option><option value="STORED" selected>STORED</option><option value="RETURNED">RETURNED</option></select><input id="fr" placeholder="Room" style="width:120px"></div></div>
+<div style="margin-top:10px;overflow:auto"><table><thead><tr><th>Date</th><th>Room</th><th>Description</th><th>Où</th><th>Par</th><th>Statut</th></tr></thead><tbody id="tb"></tbody></table></div></section>
+</main>
+<script>
+const $=id=>document.getElementById(id); const LS_API="hk_api_url_v5";
+const apiUrl=()=>localStorage.getItem(LS_API)||new URL("api/api.php",location.href).toString();
+async function api(action,body=null){const u=new URL(apiUrl());u.searchParams.set("action",action);
+const r=await fetch(u,{method:body?"POST":"GET",headers:{"Content-Type":"application/json"},body:body?JSON.stringify(body):undefined});
+const j=await r.json().catch(()=>null); if(!j||!j.ok) throw new Error(j&&j.error?j.error:"API"); return j.data;}
+let list=[];
+function render(){const st=$("f").value, rr=$("fr").value.trim(); const tb=$("tb"); tb.innerHTML="";
+const items=list.filter(d=>(st==="ALL"||(d.status||"STORED")===st) && (!rr||String(d.room||"")===rr));
+if(!items.length){tb.innerHTML='<tr><td colspan="6" style="opacity:.7">Aucun</td></tr>';return;}
+items.forEach(d=>{const tr=document.createElement("tr"); tr.innerHTML=`<td>${(d.created_at||"").slice(0,16).replace("T"," ")}</td><td><b>${d.room||""}</b></td><td>${(d.description||"").replace(/</g,"&lt;")}</td><td>${(d.where||"").replace(/</g,"&lt;")}</td><td>${(d.found_by||"").replace(/</g,"&lt;")}</td><td>${d.status||""}</td>`; tb.appendChild(tr);});}
+function wa(){const open=list.filter(d=>(d.status||"STORED")==="STORED"); if(!open.length) return "✅ Aucun objet en attente.";
+let t=["🎒 LOST & FOUND — EN STOCK"]; open.slice(0,40).forEach(d=>t.push(`• Room ${d.room||"-"} | ${d.description||""} | ${d.where||""} | ${d.found_by||""}`)); return t.join("\n");}
+async function load(){try{const d=await api("get_lost_found"); list=(d&&d.items)||[]; $("s").textContent="✅ API OK";}catch(e){list=[]; $("s").textContent="⚠️ API";} render();}
+$("add").onclick=async()=>{const item={room:$("room").value.trim(),description:$("desc").value.trim(),where:$("where").value.trim(),found_by:$("by").value.trim(),note:$("note").value.trim(),status:$("st").value}; if(!item.description) return;
+try{await api("add_lost_found",{item}); $("room").value=""; $("desc").value=""; $("where").value=""; $("by").value=""; $("note").value=""; $("st").value="STORED"; await load();}catch(e){}}
+$("f").onchange=render; $("fr").oninput=render; $("w").onclick=()=>window.open("https://wa.me/?text="+encodeURIComponent(wa()),"_blank");
+load();
+</script></body></html>

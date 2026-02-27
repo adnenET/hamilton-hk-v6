@@ -1,0 +1,5 @@
+Options -Indexes
+
+# Master PWA
+Options -Indexes
+AddType application/manifest+json .webmanifest

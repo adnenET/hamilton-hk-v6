@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Hamilton HK — Staff (V5 FINAL)</title>
+  <style>
+    :root{ --bg:#0b0f14; --card:#111826; --muted:#93a4b8; --text:#e7eef7; --line:#1e2a3b; --pri:#2d73ff; }
+    *{ box-sizing:border-box; font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial; }
+    body{ margin:0; background:linear-gradient(180deg,#0b0f14,#070a0f); color:var(--text); }
+    header{ position:sticky; top:0; z-index:20; background:rgba(11,15,20,.9); backdrop-filter: blur(10px); border-bottom:1px solid var(--line); }
+    .wrap{ max-width:1200px; margin:0 auto; padding:12px 16px; }
+    h1{ margin:0; font-size:15px; }
+    .sub{ margin-top:4px; font-size:12px; color:var(--muted); display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .pill{ display:inline-flex; gap:8px; align-items:center; padding:7px 10px; border-radius:999px; border:1px solid var(--line); background:#0b1220; font-size:12px; }
+    .btn{ padding:10px 12px; border-radius:12px; border:1px solid var(--line); background:#0b1220; color:var(--text); cursor:pointer; }
+    .btn.primary{ background:var(--pri); border-color:var(--pri); }
+    .btn:hover{ filter:brightness(1.06); }
+    .grid{ max-width:1200px; margin:0 auto; padding:16px; display:grid; grid-template-columns: 1fr; gap:12px; }
+    .card{ background:rgba(17,24,38,.92); border:1px solid var(--line); border-radius:14px; padding:14px; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+    .small{ font-size:11px; color:var(--muted); }
+    input, select{ width:100%; padding:9px 10px; border-radius:10px; border:1px solid var(--line); background:#0b1220; color:var(--text); outline:none; font-size:12px; }
+    .table{ width:100%; border-collapse:collapse; overflow:hidden; border-radius:14px; border:1px solid var(--line); }
+    .table th,.table td{ padding:10px 10px; border-bottom:1px solid rgba(30,42,59,.6); vertical-align:top; font-size:12px; }
+    .table th{ text-align:left; color:#cfe0ff; background:#0b1220; }
+    .table tr:last-child td{ border-bottom:none; }
+    .ok{ color:#7cf2b5; } .warn{ color:#ffd48a; }
+    .row{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+    @media(min-width:900px){ .row{ grid-template-columns: 1fr 1fr 1fr 1fr; } }
+  </style>
+</head>
+<body>
+<header class="no-print">
+  <div class="wrap" style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
+    <div>
+      <h1>Hamilton HK — Staff <span class="pill">V5 FINAL</span></h1>
+      <div class="sub">
+        <span class="pill">BD staff : matricule / nom / rôle / extra / actif</span>
+        <span class="pill">Sauvegarde dans roster.json</span>
+      </div>
+    </div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <button class="btn" id="btnBack">← Retour PMS</button>
+      <button class="btn" id="btnAdd">+ Ajouter</button>
+      <button class="btn primary" id="btnSave">Sauver</button>
+    </div>
+  </div>
+</header>
+
+<div class="grid">
+  <section class="card">
+    <div class="small" id="statusMsg"></div>
+    <div style="margin-top:10px; overflow:auto;">
+      <table class="table">
+        <thead><tr>
+          <th>Matricule</th><th>Nom</th><th>Rôle</th><th>Coef base</th><th>Étages préférés</th><th>Extra</th><th>Actif</th><th></th>
+        </tr></thead>
+        <tbody id="body"></tbody>
+      </table>
+    </div>
+    <div class="small" style="margin-top:10px;">
+      Astuce: tu peux ajouter des extras (is_extra=Oui) ou désactiver un salarié (Actif=Non) sans supprimer l'historique.
+    </div>
+  </section>
+</div>
+
+<script>
+const $ = (id)=>document.getElementById(id);
+const LS_TOKEN="hk_token_v5", LS_API="hk_api_url_v5";
+function defaultApiUrl(){
+  const u=new URL(window.location.href);
+  const path=u.pathname.replace(/\/staff\.html$/, "/").replace(/\/$/,"/");
+  u.pathname=path+"api/api.php"; u.search=""; return u.toString();
+}
+function getToken(){ return localStorage.getItem(LS_TOKEN)||""; }
+function getApiUrl(){ return localStorage.getItem(LS_API)||defaultApiUrl(); }
+async function api(action, body=null){
+  const url=new URL(getApiUrl()); url.searchParams.set("action", action);
+  const headers={"Content-Type":"application/json"}; const token=getToken(); if(token) headers["X-Auth-Token"]=token;
+  const res=await fetch(url.toString(), {method: body?"POST":"GET", headers, body: body?JSON.stringify(body):undefined});
+  const j=await res.json().catch(()=>null); if(!j||!j.ok) throw new Error(j&&j.error?j.error:"API error"); return j.data;
+}
+const S={ roster:null };
+
+function render(){
+  const body=$("body"); body.innerHTML="";
+  (S.roster.staff||[]).forEach((s,i)=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML = `
+      <td><input data-i="${i}" data-k="id" value="${s.id||""}" placeholder="01"></td>
+      <td><input data-i="${i}" data-k="name" value="${s.name||""}" placeholder="Nom Prénom"></td>
+      <td>
+        <select data-i="${i}" data-k="role">
+          <option value="FC" ${((s.role||"FC")==="FC")?"selected":""}>F.C</option>
+          <option value="VALET" ${(s.role==="VALET")?"selected":""}>Valet</option>
+          <option value="SUP" ${(s.role==="SUP")?"selected":""}>Supervision</option>
+        </select>
+      </td>
+      <td><input data-i="${i}" data-k="base_coef" value="${(s.base_coef??1.0)}" placeholder="1.0"></td>
+      <td><input data-i="${i}" data-k="preferred_floors" value="${(s.preferred_floors||"")}" placeholder="ex: 1,2"></td>
+      <td>
+        <select data-i="${i}" data-k="is_extra">
+          <option value="0" ${(!s.is_extra)?"selected":""}>Non</option>
+          <option value="1" ${(s.is_extra)?"selected":""}>Oui</option>
+        </select>
+      </td>
+      <td>
+        <select data-i="${i}" data-k="active">
+          <option value="1" ${(s.active!==false)?"selected":""}>Oui</option>
+          <option value="0" ${(s.active===false)?"selected":""}>Non</option>
+        </select>
+      </td>
+      <td><button class="btn" data-del="${i}">Supprimer</button></td>
+    `;
+    body.appendChild(tr);
+  });
+  body.querySelectorAll("[data-del]").forEach(b=>{
+    b.addEventListener("click", ()=>{
+      const i=parseInt(b.dataset.del,10);
+      S.roster.staff.splice(i,1);
+      render();
+    });
+  });
+}
+
+function readTable(){
+  const rows={};
+  document.querySelectorAll("#body [data-i]").forEach(el=>{
+    const i=parseInt(el.dataset.i,10);
+    const k=el.dataset.k;
+    if(!rows[i]) rows[i]={};
+    rows[i][k]=el.value;
+  });
+  const out=Object.keys(rows).map(i=>rows[i]).map(r=>{
+    const id=(r.id||"").trim().padStart(2,"0");
+    return {
+      id,
+      name:(r.name||"").trim(),
+      role:(r.role||"FC").trim(),
+      base_coef: parseFloat(r.base_coef||"1") || 1.0,
+      preferred_floors: (r.preferred_floors||"").trim(),
+      is_extra: (r.is_extra==="1"),
+      active: (r.active!=="0")
+    };
+  }).filter(r=>r.id && r.id!=="00");
+  // unique IDs
+  const seen=new Set(); const uniq=[];
+  out.forEach(r=>{ if(!seen.has(r.id)){ seen.add(r.id); uniq.push(r);} });
+  S.roster.staff=uniq;
+}
+
+async function save(){
+  readTable();
+  try{
+    await api("save_roster", {staff:S.roster.staff});
+    $("statusMsg").innerHTML = `<span class="ok">✅ Staff sauvegardé</span>`;
+  }catch(e){
+    $("statusMsg").innerHTML = `<span class="warn">⚠️ Impossible de sauvegarder (API). Mode local: pas de BD partagée.</span>`;
+  }
+}
+
+function addRow(){
+  const next = String((S.roster.staff||[]).length+1).padStart(2,"0");
+  S.roster.staff.push({id:next,name:"",role:"FC",base_coef:1.0,preferred_floors:"",is_extra:false,active:true});
+  render();
+}
+
+async function load(){
+  try{
+    S.roster = await api("get_roster");
+    $("statusMsg").innerHTML = `<span class="ok">✅ API connectée</span>`;
+  }catch(e){
+    $("statusMsg").innerHTML = `<span class="warn">⚠️ API non disponible. Tu peux éditer mais pas sauvegarder.</span>`;
+    S.roster = {staff: Array.from({length:11},(_,i)=>({id:String(i+1).padStart(2,"0"),name:"",role:"FC",base_coef:1.0,preferred_floors:"",is_extra:false,active:true}))};
+  }
+  render();
+}
+
+$("btnBack").addEventListener("click", ()=>{ window.location.href="index.html"; });
+$("btnAdd").addEventListener("click", addRow);
+$("btnSave").addEventListener("click", save);
+
+load();
+</script>
+</body>
+</html>

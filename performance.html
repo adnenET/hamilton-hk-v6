@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Hamilton HK — Performance & KPIs (V5 FINAL)</title>
+  <style>
+    :root{ --bg:#0b0f14; --card:#111826; --muted:#93a4b8; --text:#e7eef7; --line:#1e2a3b; --pri:#2d73ff; }
+    *{ box-sizing:border-box; font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial; }
+    body{ margin:0; background:linear-gradient(180deg,#0b0f14,#070a0f); color:var(--text); }
+    header{ position:sticky; top:0; z-index:20; background:rgba(11,15,20,.9); backdrop-filter: blur(10px); border-bottom:1px solid var(--line); }
+    .wrap{ max-width:1300px; margin:0 auto; padding:12px 16px; }
+    h1{ margin:0; font-size:15px; }
+    .sub{ margin-top:4px; font-size:12px; color:var(--muted); display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .pill{ display:inline-flex; gap:8px; align-items:center; padding:7px 10px; border-radius:999px; border:1px solid var(--line); background:#0b1220; font-size:12px; }
+    .btn{ padding:10px 12px; border-radius:12px; border:1px solid var(--line); background:#0b1220; color:var(--text); cursor:pointer; }
+    .btn.primary{ background:var(--pri); border-color:var(--pri); }
+    .btn:hover{ filter:brightness(1.06); }
+    .grid{ max-width:1300px; margin:0 auto; padding:16px; display:grid; grid-template-columns:1fr; gap:12px; }
+    .card{ background:rgba(17,24,38,.92); border:1px solid var(--line); border-radius:14px; padding:14px; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+    .row{ display:grid; grid-template-columns: 1fr 240px; gap:10px; align-items:center; padding:6px 0; border-bottom:1px dashed rgba(30,42,59,.55); }
+    .row:last-child{ border-bottom:none; }
+    label{ font-size:12px; color:var(--muted); }
+    input, select{ width:100%; padding:9px 10px; border-radius:10px; border:1px solid var(--line); background:#0b1220; color:var(--text); outline:none; font-size:12px; }
+    .small{ font-size:11px; color:var(--muted); }
+    .table{ width:100%; border-collapse:collapse; overflow:hidden; border-radius:14px; border:1px solid var(--line); }
+    .table th,.table td{ padding:10px 10px; border-bottom:1px solid rgba(30,42,59,.6); vertical-align:top; font-size:12px; }
+    .table th{ text-align:left; color:#cfe0ff; background:#0b1220; }
+    .table tr:last-child td{ border-bottom:none; }
+    .ok{ color:#7cf2b5; } .warn{ color:#ffd48a; } .bad{ color:#ff6b7a; }
+  </style>
+</head>
+<body>
+<header>
+  <div class="wrap" style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
+    <div>
+      <h1>Hamilton HK — Performance & KPIs <span class="pill">V5 FINAL</span></h1>
+      <div class="sub">
+        <span class="pill">Notation /10 · Coef auto · KPI mensuel</span>
+        <span class="pill">Édite une journée déjà “finalisée”</span>
+      </div>
+    </div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <button class="btn" id="btnBack">← Retour PMS</button>
+      <button class="btn" id="btnDash">Dashboard</button>
+      <button class="btn primary" id="btnSave">Sauver notes</button>
+    </div>
+  </div>
+</header>
+
+<div class="grid">
+  <section class="card">
+    <div class="row"><label>Date</label><input id="date" type="date"></div>
+    <div class="row"><label>Shift</label><select id="shift"><option value="Day" selected>Day</option><option value="Evening">Evening</option></select></div>
+    <div class="small" id="statusMsg" style="margin-top:8px;"></div>
+  </section>
+
+  <section class="card">
+    <div style="font-weight:800; font-size:13px; color:#d7e6ff;">Notation & KPIs</div>
+    <div class="small">La sauvegarde met à jour le coefficient (lissage) et les stats mensuelles.</div>
+    <div class="small">Astuce: la note /10 peut être calculée via une checklist simple (linge, salle de bain, sol, poussière, amenities, odeur, vitres, détails). (Module léger à activer si besoin.)</div>
+    <div style="margin-top:10px; overflow:auto;">
+      <table class="table">
+        <thead><tr>
+          <th>Matricule</th><th>Nom</th><th>Minutes (jour)</th><th>Note /10</th><th>Coef</th><th>Min mois</th><th>Qualité mois</th>
+        </tr></thead>
+        <tbody id="body"></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<script>
+const $ = (id)=>document.getElementById(id);
+const LS_TOKEN="hk_token_v5", LS_API="hk_api_url_v5";
+function isoToday(){ return new Date().toISOString().slice(0,10); }
+function defaultApiUrl(){
+  const u=new URL(window.location.href);
+  const path=u.pathname.replace(/\/performance\.html$/, "/").replace(/\/$/,"/");
+  u.pathname=path+"api/api.php"; u.search=""; return u.toString();
+}
+function getToken(){ return localStorage.getItem(LS_TOKEN)||""; }
+function getApiUrl(){ return localStorage.getItem(LS_API)||defaultApiUrl(); }
+async function api(action, body=null){
+  const url=new URL(getApiUrl()); url.searchParams.set("action", action);
+  const headers={"Content-Type":"application/json"}; const token=getToken(); if(token) headers["X-Auth-Token"]=token;
+  const res=await fetch(url.toString(), {method: body?"POST":"GET", headers, body: body?JSON.stringify(body):undefined});
+  const j=await res.json().catch(()=>null); if(!j||!j.ok) throw new Error(j&&j.error?j.error:"API error"); return j.data;
+}
+
+const S={ roster:null, history:null, perf:null, entry:null };
+
+function monthStats(id, yyyymm){
+  const ps = S.perf.staff && S.perf.staff[id] && S.perf.staff[id].month && S.perf.staff[id].month[yyyymm];
+  if(!ps) return {min:0, q:"—"};
+  const q = ps.quality_n ? Math.round((ps.quality_sum/ps.quality_n)*10)/10 : "—";
+  return {min:Math.round(ps.assigned_min||0), q};
+}
+
+function getCoef(id){
+  const coef = (S.perf.staff && S.perf.staff[id] && S.perf.staff[id].coef) ? S.perf.staff[id].coef : 1.0;
+  return Math.round(coef*100)/100;
+}
+
+function loadEntry(){
+  const date=$("date").value||isoToday();
+  const shift=$("shift").value||"Day";
+  const all=(S.history.days||[]).filter(d=>d.date===date && (d.shift||"Day")===shift);
+  S.entry = all.length ? all[0] : null;
+  if(!S.entry){
+    $("statusMsg").innerHTML = `<span class="warn">⚠️ Aucun "fin de journée" trouvé pour ${date} / ${shift}. Finalise d'abord depuis la page PMS.</span>`;
+  }else{
+    $("statusMsg").innerHTML = `<span class="ok">✅ Journée chargée (${date} / ${shift}) — tu peux noter et sauvegarder</span>`;
+  }
+}
+
+function render(){
+  loadEntry();
+  const date=$("date").value||isoToday();
+  const month=date.slice(0,7);
+  const tbody=$("body"); tbody.innerHTML="";
+  const staff=(S.roster.staff||[]).filter(s=>s.active!==false && (s.role||"FC")==="FC");
+
+  staff.forEach(s=>{
+    const min = S.entry && S.entry.assignments && S.entry.assignments[s.id] ? Math.round(S.entry.assignments[s.id].minutes||0) : 0;
+    const q = S.entry && S.entry.quality && (s.id in S.entry.quality) ? S.entry.quality[s.id] : "";
+    const ms = monthStats(s.id, month);
+    const tr=document.createElement("tr");
+    tr.innerHTML = `
+      <td><b>${s.id}</b></td>
+      <td>${(s.name||"").trim()}</td>
+      <td><b>${min}</b></td>
+      <td><input data-q="${s.id}" type="number" min="1" max="10" step="1" value="${q}"></td>
+      <td>${getCoef(s.id)}</td>
+      <td>${ms.min}</td>
+      <td>${ms.q}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function collectQuality(){
+  const q={};
+  document.querySelectorAll("[data-q]").forEach(inp=>{
+    const id=inp.dataset.q;
+    const v=parseFloat(inp.value);
+    if(!isNaN(v) && v>=1 && v<=10) q[id]=v;
+  });
+  return q;
+}
+
+async function save(){
+  if(!S.entry){ render(); return; }
+  const payload = {
+    date: S.entry.date,
+    shift: S.entry.shift || "Day",
+    roomStates: S.entry.roomStates || {},
+    assignments: S.entry.assignments || {},
+    restCredits: S.entry.restCredits || {},
+    quality: collectQuality(),
+    stats: S.entry.stats || {}
+  };
+  try{
+    await api("finalize_day", payload); // overwrites day/shift entry & updates performance
+    S.history = await api("get_history");
+    S.perf = await api("get_performance");
+    $("statusMsg").innerHTML = `<span class="ok">✅ Notes sauvegardées (coef + KPI mis à jour)</span>`;
+    render();
+  }catch(e){
+    $("statusMsg").innerHTML = `<span class="warn">⚠️ Sauvegarde impossible (API). Utilise XAMPP / serveur.</span>`;
+  }
+}
+
+async function loadAll(){
+  $("date").value = isoToday();
+  try{
+    S.roster = await api("get_roster");
+    S.history = await api("get_history");
+    S.perf = await api("get_performance");
+    $("statusMsg").innerHTML = `<span class="ok">✅ API connectée</span>`;
+  }catch(e){
+    $("statusMsg").innerHTML = `<span class="warn">⚠️ API non disponible.</span>`;
+    S.roster = {staff:[]}; S.history={days:[]}; S.perf={staff:{}};
+  }
+  render();
+}
+
+$("btnBack").addEventListener("click", ()=>{ window.location.href="index.html"; });
+$("btnDash").addEventListener("click", ()=>{ window.location.href="dashboard.html"; });
+$("btnSave").addEventListener("click", save);
+$("date").addEventListener("change", render);
+$("shift").addEventListener("change", render);
+
+loadAll();
+</script>
+</body>
+</html>

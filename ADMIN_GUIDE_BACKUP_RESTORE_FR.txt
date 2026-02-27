@@ -1,0 +1,35 @@
+Guide Admin — Sauvegarde / Restauration (V2.3)
+Date: 2026-02-27
+
+1) Dossier backups
+- Créer: /data/backups
+- Permissions recommandées: 775 sur /data et /data/backups
+
+2) Cron (sauvegarde automatique)
+Commande:
+php -f /path/to/hk/backup.php
+
+Exemple cPanel (adapter le chemin):
+php -f /home/USER/hk.taghazout.io/backup.php
+
+Fréquence conseillée:
+- Quotidien: 03:00
+
+3) Sauvegarde manuelle
+- POST /api/api.php?action=backup_now (X-Auth-Token requis)
+- Résultat: /data/backups/backup-YYYYMMDD-HHMMSS.zip
+
+4) Restauration (méthode simple)
+- Télécharger un zip depuis /data/backups
+- Extraire
+- Remplacer les *.json dans /data/
+- Conserver une copie avant remplacement
+
+5) Token API
+- Token stocké dans /api/config.php ($HK_TOKEN)
+- À la première erreur "Unauthorized", l'app demande le token et le mémorise (localStorage hk_token).
+- Token requis pour toutes les opérations POST (écriture), login exclu.
+
+6) Journal d'activité
+- Fichier: /data/audit_trail.json
+- Page: /logs.html (lecture)

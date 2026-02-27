@@ -1,0 +1,693 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hamilton HK</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0f172a">
+<style>
+:root{--bg:#0b1220;--card:#0f172a;--line:#1f2a44;--txt:#e2e8f0;--muted:#94a3b8;--pri:#1d4ed8;--danger:#b91c1c;--ok:#10b981;--warn:#f59e0b;--bad:#ef4444}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;background:linear-gradient(180deg,#060b14,#0b1220);color:var(--txt)}
+header{position:sticky;top:0;z-index:10;background:rgba(6,11,20,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.top{display:flex;align-items:center;gap:10px;padding:10px 12px}
+.logo{width:34px;height:34px;border-radius:10px;border:1px solid var(--line);overflow:hidden;background:#0b1220}
+.logo img{width:100%;height:100%;object-fit:cover}
+.title{flex:1;min-width:0}
+.title b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.title span{display:block;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.btn{border:1px solid var(--line);background:#0b1220;color:var(--txt);padding:8px 10px;border-radius:10px;font-size:12px}
+.btn.primary{background:var(--pri);border-color:var(--pri)}
+.btn.danger{background:var(--danger);border-color:var(--danger)}
+.btn.ok{background:var(--ok);border-color:var(--ok)}
+.btn.warn{background:var(--warn);border-color:var(--warn);color:#111827}
+main{max-width:1100px;margin:0 auto;padding:12px}
+.card{background:rgba(15,23,42,.88);border:1px solid var(--line);border-radius:16px;padding:12px;margin-bottom:10px}
+h2{margin:0 0 10px 0;font-size:14px}
+h3{margin:12px 0 8px 0;font-size:13px}
+label{display:block;margin:10px 0 6px;color:var(--muted);font-size:11px}
+input,select,textarea{width:100%;padding:10px;border-radius:12px;border:1px solid var(--line);background:#0b1220;color:var(--txt);font-size:13px}
+textarea{min-height:88px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.notice{padding:10px;border:1px dashed var(--line);border-radius:14px;background:rgba(15,23,42,.55);color:var(--muted);font-size:12px}
+.grid{display:grid;gap:10px}
+@media(min-width:900px){.grid.cols2{grid-template-columns:1fr 1fr}.grid.cols3{grid-template-columns:1fr 1fr 1fr}}
+.tile{display:block;text-decoration:none;color:var(--txt);background:#0b1220;border:1px solid var(--line);border-radius:16px;padding:12px}
+.tile b{display:flex;align-items:center;gap:8px;font-size:13px}
+.tile span{display:block;color:var(--muted);font-size:12px;margin-top:6px}
+.pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;border:1px solid var(--line);background:#0b1220;color:var(--muted)}
+.pill.ok{color:#d1fae5;border-color:#065f46;background:rgba(16,185,129,.15)}
+.pill.warn{color:#ffedd5;border-color:#92400e;background:rgba(245,158,11,.15)}
+.pill.bad{color:#fee2e2;border-color:#7f1d1d;background:rgba(239,68,68,.15)}
+table{width:100%;border-collapse:separate;border-spacing:0;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+th,td{padding:9px 10px;border-bottom:1px solid var(--line);font-size:12px;vertical-align:top}
+th{background:#0b1220;color:#cbd5e1;text-align:left}
+tr:last-child td{border-bottom:none}
+.small{font-size:11px;color:var(--muted)}
+a.link{color:#93c5fd;text-decoration:none}
+a.link:hover{text-decoration:underline}
+.nav{display:flex;gap:8px;overflow:auto;padding:8px 12px;border-top:1px solid var(--line)}
+.nav button{white-space:nowrap}
+</style>
+</head>
+<body>
+<header>
+  <div class="top">
+    <div class="logo" id="logo"></div>
+    <div class="title">
+      <b>Hamilton HK</b>
+      <span id="sub">Mode léger • Mobile & Desktop</span>
+    </div>
+    <button class="btn" id="sync">🔄 Sync</button>
+    <button class="btn danger" id="logout">⏻</button>
+  </div>
+  <div class="nav" id="nav"></div>
+</header>
+<main id="app"></main>
+
+<script>
+const API="api/api.php";
+const LS={session:"hk_session_simple", cache:"hk_cache_simple", queue:"hk_queue_simple"};
+const NAV=[
+  {id:"home", label:"🏠 Accueil"},
+  {id:"pms", label:"🏨 PMS"},
+  {id:"terrain", label:"⚡ Terrain"},
+  {id:"control", label:"🛂 Contrôle"},
+  {id:"plus", label:"➕ Plus"},
+  {id:"admin", label:"🛠 Admin", admin:true}
+];
+
+
+function sanitizeText(s,max=500){
+  s=(s??"").toString().trim();
+  s=s.replace(/[\u0000-\u001F\u007F]/g,"");
+  if(s.length>max) s=s.slice(0,max);
+  return s;
+}
+function sanitizeRoom(rn){
+  rn=sanitizeText(rn,10);
+  return (/^\d{3}$/).test(rn)?rn:"";
+}
+function sanitizeScore(v){
+  const n=parseInt(v,10);
+  if(Number.isNaN(n)) return null;
+  return Math.min(100, Math.max(0, n));
+}
+let S={settings:null, rooms:null, state:null, toilets:null, tickets:null, lostfound:null, audits:null, auth:null, defects:null, requests:null, performance:null, inventory:null, incidents:null, groups:null, dispatchHist:null, session:null};
+
+const $=(s,e=document)=>e.querySelector(s);
+const $$=(s,e=document)=>Array.from(e.querySelectorAll(s));
+function saveSession(x){localStorage.setItem(LS.session,JSON.stringify(x));S.session=x}
+function loadSession(){try{return JSON.parse(localStorage.getItem(LS.session)||"null")}catch(e){return null}}
+function clearSession(){localStorage.removeItem(LS.session);S.session=null}
+function cacheSave(){localStorage.setItem(LS.cache,JSON.stringify({at:new Date().toISOString(),...S}))}
+function cacheLoad(){try{return JSON.parse(localStorage.getItem(LS.cache)||"null")}catch(e){return null}}
+function queueLoad(){try{return JSON.parse(localStorage.getItem(LS.queue)||"[]")}catch(e){return []}}
+function queueSave(q){localStorage.setItem(LS.queue,JSON.stringify(q))}
+function enqueue(item){const q=queueLoad(); q.push(item); queueSave(q);}
+async function g(action){
+  const t=localStorage.getItem("hk_token")||"";
+  const r=await fetch(`${API}?action=${encodeURIComponent(action)}`,{headers: t?{"X-Auth-Token":t}:{}});
+  const j=await r.json();
+  if(!j.ok) throw new Error(j.error||"Erreur API");
+  return j.data;
+}
+
+function renderNav(active){
+  const el=$("#nav"); el.innerHTML="";
+  NAV.forEach(n=>{
+    if(n.admin && !isAdmin()) return;
+    const b=document.createElement("button");
+    b.className="btn"+(n.id===active?" primary":"");
+    b.textContent=n.label;
+    b.onclick=()=>location.hash="#"+n.id;
+    el.appendChild(b);
+  });
+}
+
+function loginView(){
+  return `<div class="card">
+    <h2>Connexion</h2>
+    <label>Matricule</label><input id="mat" placeholder="Ex: 5001">
+    <label>PIN</label><input id="pin" type="password" placeholder="••••">
+    <div class="row" style="margin-top:10px"><button class="btn primary" id="btnLogin">Se connecter</button></div>
+    <div class="notice" style="margin-top:10px">Si le réseau est faible, l’app enregistre et synchronise ensuite.</div>
+  </div>`;
+}
+
+function homeView(){
+  const rooms=S.state?.rooms||{};
+  const count=(k)=>Object.values(rooms).filter(x=>x.status===k).length;
+  const unv=Object.values(rooms).filter(x=>x.status==="ARRIVEE" && !(x.workflow&&x.workflow.verified_by)).length;
+  const q=queueLoad().length;
+  return `
+    <div class="card">
+      <h2>Résumé du jour</h2>
+      <div class="row">
+        <span class="pill ok">Arrivées: ${count("ARRIVEE")}</span>
+        <span class="pill warn">Départs: ${count("DEPART")}</span>
+        <span class="pill bad">Délogement: ${count("DELOGEMENT")}</span>
+        <span class="pill bad">Non validées: ${unv}</span>
+        <span class="pill warn">Offline: ${q}</span>
+      </div>
+      <div class="notice" style="margin-top:10px">Priorités: Délogement → Arrivée → Départ → Libre sale → Recouche → Deep → Public Areas</div>
+    </div>
+
+    <div class="grid cols3">
+      <a class="tile" href="#pms"><b>🏨 PMS</b><span>Mettre à jour statuts / types / workflow Terminé → Valider</span></a>
+      <a class="tile" href="#terrain"><b>⚡ Terrain</b><span>Actions rapides (ticket, rework, terminé)</span></a>
+      <a class="tile" href="#control"><b>🛂 Contrôle</b><span>Arrivées non validées, urgents, reworks</span></a>
+      <a class="tile" href="#plus"><b>➕ Plus</b><span>Toilettes, Tech, L&F, Audits, Stocks, Incidents, Groupes</span></a>
+      ${isAdmin()?`<a class="tile" href="#admin"><b>🛠 Admin</b><span>Utilisateurs, rôles, PIN, accès</span></a>`:""}
+    </div>
+  `;
+}
+
+function pmsView(){
+  const floors=[1,2,3,4,5,6,7];
+  const floor=parseInt((new URLSearchParams(location.search)).get("floor")||"1",10);
+  const types=(S.settings?.room_types||[]).map(t=>`<option value="${t.code}">${t.label}</option>`).join("");
+  const st=(S.settings?.room_statuses||["BLOQUEE","OCCUPEE","LIBRE_PROPRE","LIBRE_SALE","DEPART","ARRIVEE","DELOGEMENT"]).map(x=>`<option value="${x}">${x}</option>`).join("");
+  const rooms=(S.rooms?.rooms||[]).filter(r=>r.floor===floor);
+  const cur=S.state?.rooms||{};
+  const rows=rooms.map(r=>{
+    const c=cur[r.number]||{status:"LIBRE_PROPRE",type:r.type,beds:r.beds,notes:"",workflow:{}};
+    const wf=c.workflow||{};
+    const done=wf.done_by?`✅ Terminé: ${wf.done_by}`:"—";
+    const ver=wf.verified_by?`🛂 Validé: ${wf.verified_by}`:"—";
+    return `<tr>
+      <td><b>${r.number}</b><div class="small">${done}<br>${ver}</div></td>
+      <td>${pill(c.status)}<div class="small">${c.type} • ${c.beds} lits</div></td>
+      <td>
+        <select data-room="${r.number}" data-k="status">${st}</select>
+        <select data-room="${r.number}" data-k="type">${types}</select>
+        <input data-room="${r.number}" data-k="beds" type="number" min="1" value="${c.beds}">
+        <input data-room="${r.number}" data-k="notes" placeholder="Notes" value="${(c.notes||"").replace(/"/g,'&quot;')}">
+        <div class="row" style="margin-top:8px">
+          <button class="btn ok" data-act="done" data-room="${r.number}">✅ Terminé</button>
+          <button class="btn primary" data-act="verify" data-room="${r.number}">🛂 Valider</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join("");
+  const floorBtns=floors.map(f=>`<button class="btn ${f===floor?"primary":""}" data-floor="${f}">${f}F</button>`).join("");
+  return `<div class="card">
+    <h2>🏨 PMS — Étage ${floor}</h2>
+    <div class="row">${floorBtns}</div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn primary" id="saveState">💾 Enregistrer</button>
+      <button class="btn" id="markArr">➕ Arrivées</button>
+      <button class="btn" id="markDep">➖ Départs</button>
+    </div>
+    <table><tr><th>Chambre</th><th>Statut</th><th>Actions</th></tr>${rows||"<tr><td colspan=3 class=small>Aucune</td></tr>"}</table>
+  </div>`;
+}
+
+function terrainView(){
+  return `<div class="card">
+    <h2>⚡ Mode Terrain</h2>
+    <div class="notice">Choisissez une chambre, puis une action.</div>
+    <label>Chambre</label><input id="trRoom" placeholder="Ex: 203">
+    <div class="row" style="margin-top:10px">
+      <button class="btn ok" id="trDone">✅ Terminé</button>
+      <button class="btn primary" id="trVerify">🛂 Valider</button>
+      <button class="btn warn" id="trTicket">🧰 Ticket technique</button>
+      <button class="btn" id="trDefect">🧼 Rework</button>
+    </div>
+  </div>`;
+}
+
+function controlView(){
+  const rooms=S.state?.rooms||{};
+  const arr=Object.entries(rooms).filter(([k,v])=>v.status==="ARRIVEE" && !(v.workflow&&v.workflow.verified_by)).slice(0,80);
+  const defects=(S.defects?.defects||[]).filter(d=>d.status==="OPEN").slice().reverse().slice(0,50);
+  const tickets=(S.tickets?.tickets||[]).filter(t=>t.priority==="URGENT" && (t.status||"")!=="CLOSED").slice().reverse().slice(0,50);
+  const aRows=arr.map(([rn,v])=>`<tr><td><b>${rn}</b></td><td>${pill(v.status)}</td><td>${(v.workflow?.done_by||"—")}</td></tr>`).join("");
+  const dRows=defects.map(d=>`<tr><td><b>${d.id}</b></td><td>${d.room||""}</td><td>${d.kind||""}</td></tr>`).join("");
+  const tRows=tickets.map(t=>`<tr><td><b>${t.id}</b></td><td>${t.location||t.room||""}</td><td>${t.assigned_to||""}</td></tr>`).join("");
+  return `<div class="grid cols2">
+    <div class="card"><h2>🛂 Arrivées non validées</h2>
+      <table><tr><th>Ch</th><th>Statut</th><th>Terminé</th></tr>${aRows||"<tr><td colspan=3 class=small>RAS</td></tr>"}</table>
+    </div>
+    <div class="card"><h2>🧼 Reworks ouverts</h2>
+      <table><tr><th>ID</th><th>Ch</th><th>Type</th></tr>${dRows||"<tr><td colspan=3 class=small>RAS</td></tr>"}</table>
+    </div>
+    <div class="card"><h2>🧰 Tickets urgents</h2>
+      <table><tr><th>ID</th><th>Lieu</th><th>Tech</th></tr>${tRows||"<tr><td colspan=3 class=small>RAS</td></tr>"}</table>
+    </div>
+    <div class="card"><h2>📌 Rappel</h2>
+      <div class="notice">B2B = départ + arrivée le même jour. Objectif: Arrivées prêtes avant 14:00.</div>
+    </div>
+  </div>`;
+}
+
+function plusView(){
+  const users=safeUsers();
+  const techOptions=users.filter(u=>u.active && u.role==="TECH").map(u=>`<option value="${u.matricule}">${u.matricule} - ${u.name}</option>`).join("");
+  return `<div class="grid cols2">
+    <div class="card"><h2>🚻 Toilettes 1h</h2>
+      <button class="btn primary" onclick="location.hash='#toilets'">Ouvrir</button>
+    </div>
+    <div class="card"><h2>🧰 Tickets techniques</h2>
+      <button class="btn primary" onclick="location.hash='#tickets'">Ouvrir</button>
+    </div>
+    <div class="card"><h2>🧼 Rework</h2>
+      <button class="btn primary" onclick="location.hash='#defects'">Ouvrir</button>
+    </div>
+    <div class="card"><h2>🧾 Audits</h2>
+      <button class="btn primary" onclick="location.hash='#audits'">Ouvrir</button>
+    </div>
+    <div class="card"><h2>🔑 Lost & Found</h2>
+      <button class="btn primary" onclick="location.hash='#lostfound'">Ouvrir</button>
+    </div>
+    <div class="card"><h2>📦 Stocks</h2>
+      <button class="btn primary" onclick="location.hash='#stocks'">Ouvrir</button>
+    </div>
+    <div class="card"><h2>📣 Réception</h2>
+      <button class="btn primary" onclick="location.hash='#requests'">Ouvrir</button>
+    </div>
+    <div class="card"><h2>🧯 Incidents</h2>
+      <button class="btn primary" onclick="location.hash='#incidents'">Ouvrir</button>
+    </div>
+    <div class="card"><h2>🎉 Groupes</h2>
+      <button class="btn primary" onclick="location.hash='#groups'">Ouvrir</button>
+    </div>
+    <div class="card"><h2>💬 WhatsApp</h2>
+      <button class="btn primary" onclick="location.hash='#whatsapp'">Ouvrir</button>
+    </div>
+  </div>`;
+}
+
+// Reuse existing pages from previous build by delegating to hash views if present
+function simpleStub(title, body){ return `<div class="card"><h2>${title}</h2>${body}</div>`; }
+
+function adminView(){
+  if(!isAdmin()) return simpleStub("🛠 Admin", "<div class='notice'>Accès Admin uniquement.</div>");
+  const users=safeUsers();
+  const rows=users.map(u=>`<tr>
+    <td><b>${u.matricule}</b></td>
+    <td><input data-u="${u.matricule}" data-k="name" value="${u.name||""}"></td>
+    <td><select data-u="${u.matricule}" data-k="role">${["ADMIN","GG","ASSISTANTE","REFERENTE","RECEPTION","TECH","FC"].map(r=>`<option value="${r}" ${u.role===r?"selected":""}>${r}</option>`).join("")}</select></td>
+    <td><input data-u="${u.matricule}" data-k="pin" value="${u.pin||""}"></td>
+    <td><select data-u="${u.matricule}" data-k="active"><option value="true" ${u.active?"selected":""}>Actif</option><option value="false" ${!u.active?"selected":""}>Inactif</option></select></td>
+  </tr>`).join("");
+  return `<div class="card">
+    <h2>🛠 Admin — Utilisateurs</h2>
+    <div class="row">
+      <button class="btn primary" id="authSave">💾 Enregistrer</button>
+      <button class="btn" id="authAdd">➕ Ajouter</button>
+    </div>
+    <table style="margin-top:10px"><tr><th>Matricule</th><th>Nom</th><th>Rôle</th><th>PIN</th><th>Statut</th></tr>${rows||""}</table>
+  </div>`;
+}
+
+/* Minimal implementations for extra views used by Plus */
+function toiletsView(){
+  const zones=["Hall-F","Hall-H","Hall-PMR","Restaurant-F","Restaurant-H","Restaurant-PMR","Piscine-F","Piscine-H","Piscine-PMR"];
+  const opt=zones.map(z=>`<option>${z}</option>`).join("");
+  const rows=(S.toilets?.logs||[]).slice().reverse().slice(0,60).map(e=>`<tr><td>${e.saved_at||""}</td><td>${e.zone||""}</td><td>${e.okko||""}</td><td>${e.notes||""}</td></tr>`).join("");
+  return `<div class="card"><h2>🚻 Toilettes publiques</h2>
+    <label>Zone</label><select id="wcZone">${opt}</select>
+    <label>OK/KO</label><select id="wcOK"><option>OK</option><option>KO</option></select>
+    <label>Remarques</label><input id="wcNotes" placeholder="manque papier / fuite / odeur">
+    <div class="row" style="margin-top:10px"><button class="btn primary" id="wcSave">Enregistrer</button></div>
+  </div>
+  <div class="card"><h2>Historique</h2>
+    <table><tr><th>Date</th><th>Zone</th><th>OK/KO</th><th>Remarques</th></tr>${rows||"<tr><td colspan=4 class=small>Aucun</td></tr>"}</table>
+  </div>`;
+}
+
+function ticketsView(){
+  const users=safeUsers();
+  const tech=users.filter(u=>u.active && u.role==="TECH").map(u=>`<option value="${u.matricule}">${u.matricule} - ${u.name}</option>`).join("");
+  const rows=(S.tickets?.tickets||[]).slice().reverse().slice(0,60).map(t=>`<tr><td><b>${t.id}</b></td><td>${t.priority||""}</td><td>${t.location||t.room||""}</td><td>${t.status||""}</td></tr>`).join("");
+  return `<div class="card"><h2>🧰 Tickets techniques</h2>
+    <label>Chambre (option)</label><input id="tkRoom" placeholder="203">
+    <label>Localisation</label><input id="tkLoc" placeholder="Hall / chambre 203">
+    <label>Catégorie</label><select id="tkCat"><option>Plomberie</option><option>Électricité</option><option>Climatisation</option><option>TV/Internet</option><option>Serrurerie</option><option>Mobilier</option><option>Peinture</option><option>Autre</option></select>
+    <label>Priorité</label><select id="tkPrio"><option>NORMAL</option><option>URGENT</option><option>CRITIQUE</option></select>
+    <label>Assigner</label><select id="tkAsg"><option value="">—</option>${tech}</select>
+    <label>Description</label><textarea id="tkDesc"></textarea>
+    <button class="btn primary" id="tkCreate">Créer</button>
+  </div>
+  <div class="card"><h2>Historique</h2>
+    <table><tr><th>ID</th><th>Prio</th><th>Lieu</th><th>Statut</th></tr>${rows||"<tr><td colspan=4 class=small>Aucun</td></tr>"}</table>
+  </div>`;
+}
+
+function defectsView(){
+  const rows=(S.defects?.defects||[]).slice().reverse().slice(0,60).map(d=>`<tr><td><b>${d.id}</b></td><td>${d.room||""}</td><td>${d.kind||""}</td><td>${d.status||""}</td></tr>`).join("");
+  return `<div class="card"><h2>🧼 Rework</h2>
+    <label>Chambre</label><input id="dfRoom" placeholder="203">
+    <label>Type défaut</label><select id="dfKind"><option>Odeur</option><option>Calcaire</option><option>Vitres/miroirs</option><option>Poussière</option><option>Sol/angles</option><option>Amenities manquants</option><option>Autre</option></select>
+    <label>Commentaire</label><textarea id="dfNotes"></textarea>
+    <button class="btn primary" id="dfCreate">Créer</button>
+  </div>
+  <div class="card"><h2>Historique</h2>
+    <table><tr><th>ID</th><th>Ch</th><th>Type</th><th>Statut</th></tr>${rows||"<tr><td colspan=4 class=small>Aucun</td></tr>"}</table>
+  </div>`;
+}
+
+function auditsView(){
+  const rows=(S.audits?.audits||[]).slice().reverse().slice(0,60).map(a=>`<tr><td><b>${a.id}</b></td><td>${a.kind||""}</td><td>${a.room||""}</td><td>${a.score||0}/100</td></tr>`).join("");
+  return `<div class="card"><h2>🧾 Audits</h2>
+    <label>Type</label><select id="auKind"><option>Arrivée</option><option>Service quotidien</option><option>Soir (option)</option></select>
+    <label>Chambre</label><input id="auRoom" placeholder="203">
+    <label>Score</label><input id="auScore" type="number" min="0" max="100" value="85">
+    <label>Notes</label><textarea id="auNotes"></textarea>
+    <button class="btn primary" id="auCreate">Enregistrer</button>
+  </div>
+  <div class="card"><h2>Historique</h2>
+    <table><tr><th>ID</th><th>Type</th><th>Ch</th><th>Score</th></tr>${rows||"<tr><td colspan=4 class=small>Aucun</td></tr>"}</table>
+  </div>`;
+}
+
+function lostfoundView(){
+  const rows=(S.lostfound?.items||[]).slice().reverse().slice(0,60).map(it=>`<tr><td><b>${it.id}</b></td><td>${it.kind||""}</td><td>${it.where||""}</td><td>${it.desc||""}</td></tr>`).join("");
+  return `<div class="card"><h2>🔑 Lost & Found</h2>
+    <label>Type</label><select id="lfKind"><option value="NON_VALEUR">Non‑valeur</option><option value="VALEUR">Valeur</option></select>
+    <label>Lieu</label><input id="lfWhere" placeholder="chambre 203 / hall">
+    <label>Description</label><textarea id="lfDesc"></textarea>
+    <button class="btn primary" id="lfCreate">Créer</button>
+  </div>
+  <div class="card"><h2>Historique</h2>
+    <table><tr><th>ID</th><th>Type</th><th>Lieu</th><th>Description</th></tr>${rows||"<tr><td colspan=4 class=small>Aucun</td></tr>"}</table>
+  </div>`;
+}
+
+function stocksView(){
+  const inv=S.inventory?.items||[];
+  const rows=inv.map(it=>`<tr><td><b>${it.label}</b><div class="small">${it.unit}</div></td><td>${it.stock}</td><td>${it.min}</td><td><input data-id="${it.id}" value="${it.stock}" type="number"></td></tr>`).join("");
+  return `<div class="card"><h2>📦 Stocks</h2>
+    <button class="btn primary" id="invSave">💾 Enregistrer</button>
+    <table style="margin-top:10px"><tr><th>Article</th><th>Stock</th><th>Min</th><th>MàJ</th></tr>${rows||"<tr><td colspan=4 class=small>Aucun</td></tr>"}</table>
+  </div>`;
+}
+
+function requestsView(){
+  const rows=(S.requests?.requests||[]).slice().reverse().slice(0,60).map(r=>`<tr><td><b>${r.id}</b></td><td>${r.type||""}</td><td>${r.room||""}</td><td>${r.status||""}</td></tr>`).join("");
+  return `<div class="card"><h2>📣 Réception → HK</h2>
+    <label>Type</label>
+    <select id="rqType"><option>Coffre (information HK)</option><option>Lit bébé</option><option>Iron/Board</option><option>Early check‑in (exception)</option><option>Délogement</option><option>Autre</option></select>
+    <label>Chambre</label><input id="rqRoom" placeholder="305">
+    <label>Détails</label><textarea id="rqDesc"></textarea>
+    <button class="btn primary" id="rqCreate">Créer</button>
+  </div>
+  <div class="card"><h2>Historique</h2><table><tr><th>ID</th><th>Type</th><th>Ch</th><th>Statut</th></tr>${rows||"<tr><td colspan=4 class=small>Aucune</td></tr>"}</table></div>`;
+}
+
+function incidentsView(){
+  const rows=(S.incidents?.incidents||[]).slice().reverse().slice(0,60).map(i=>`<tr><td><b>${i.id}</b></td><td>${i.type||""}</td><td>${i.location||""}</td></tr>`).join("");
+  return `<div class="card"><h2>🧯 Incidents</h2>
+    <label>Type</label><select id="inType"><option>Chute / Blessure</option><option>Casse</option><option>Biohazard</option><option>Client agressif</option><option>Autre</option></select>
+    <label>Lieu</label><input id="inLoc" placeholder="ex: chambre 203 / hall">
+    <label>Détails</label><textarea id="inDesc"></textarea>
+    <button class="btn primary" id="inCreate">Enregistrer</button>
+  </div>
+  <div class="card"><h2>Historique</h2><table><tr><th>ID</th><th>Type</th><th>Lieu</th></tr>${rows||"<tr><td colspan=3 class=small>Aucun</td></tr>"}</table></div>`;
+}
+
+function groupsView(){
+  const rows=(S.groups?.groups||[]).slice().reverse().slice(0,60).map(g=>`<tr><td><b>${g.id}</b></td><td>${g.name||""}</td><td>${g.date||""}</td><td>${(g.rooms||[]).join(", ")}</td></tr>`).join("");
+  return `<div class="card"><h2>🎉 Groupes</h2>
+    <label>Nom</label><input id="grName" placeholder="Nom groupe">
+    <label>Date</label><input id="grDate" type="date">
+    <label>Chambres (virgules)</label><input id="grRooms" placeholder="101,102,203">
+    <label>Notes</label><textarea id="grNotes"></textarea>
+    <button class="btn primary" id="grCreate">Créer</button>
+  </div>
+  <div class="card"><h2>Historique</h2><table><tr><th>ID</th><th>Nom</th><th>Date</th><th>Chambres</th></tr>${rows||"<tr><td colspan=4 class=small>Aucun</td></tr>"}</table></div>`;
+}
+
+function whatsappView(){
+  return `<div class="card"><h2>💬 WhatsApp</h2>
+    <button class="btn primary" id="waCopy">Copier résumé du jour</button>
+    <textarea id="waText" style="margin-top:10px" placeholder="Le résumé apparaîtra ici..."></textarea>
+  </div>`;
+}
+
+function viewRouter(id){
+  const map={home:homeView,pms:pmsView,terrain:terrainView,control:controlView,plus:plusView,admin:adminView,
+             toilets:toiletsView,tickets:ticketsView,defects:defectsView,audits:auditsView,lostfound:lostfoundView,
+             stocks:stocksView,requests:requestsView,incidents:incidentsView,groups:groupsView,whatsapp:whatsappView};
+  return (map[id]||homeView)();
+}
+
+async function syncQueue(){
+  const q=queueLoad();
+  if(!q.length) return;
+  let kept=[];
+  for(const item of q){
+    try{ await p(item.action,item.body); }catch(e){ kept.push(item); }
+  }
+  queueSave(kept);
+}
+
+function bind(view){
+  $("#logout").onclick=()=>{clearSession(); location.reload();};
+  $("#sync").onclick=async()=>{ try{ await syncQueue(); await loadAll(true); toast("Synchronisation OK"); }catch(e){ toast(e.message); } };
+
+  if(view==="pms"){
+    $$("button[data-floor]").forEach(b=>b.onclick=()=>{ const f=b.dataset.floor; const u=new URL(location.href); u.searchParams.set("floor",f); history.replaceState({}, "", u.toString()); render("pms"); });
+    $$("select[data-k='status']").forEach(sel=>sel.value=S.state.rooms[sel.dataset.room].status);
+    $$("select[data-k='type']").forEach(sel=>sel.value=S.state.rooms[sel.dataset.room].type);
+    $$("input[data-k='beds']").forEach(inp=>inp.value=S.state.rooms[inp.dataset.room].beds);
+    $$("input[data-k='notes']").forEach(inp=>inp.value=S.state.rooms[inp.dataset.room].notes||"");
+    $$("button[data-act]").forEach(btn=>btn.onclick=async()=>{
+      const rn=btn.dataset.room, act=btn.dataset.act;
+      const wf=(S.state.rooms[rn].workflow)||{};
+      if(act==="done"){wf.done_by=S.session.matricule; wf.done_at=new Date().toISOString();}
+      if(act==="verify"){wf.verified_by=S.session.matricule; wf.verified_at=new Date().toISOString();}
+      try{ await p("set_room_workflow",{room:rn,workflow:wf}); S.state=await g("get_current_state"); cacheSave(); render("pms"); }
+      catch(e){ enqueue({action:"set_room_workflow", body:{room:rn,workflow:wf}}); S.state.rooms[rn].workflow=wf; cacheSave(); toast("Enregistré hors-ligne"); render("pms"); }
+    });
+    $("#saveState").onclick=async()=>{
+      const rooms=structuredClone(S.state.rooms);
+      $$("select[data-k='status']").forEach(sel=>rooms[sel.dataset.room].status=sel.value);
+      $$("select[data-k='type']").forEach(sel=>rooms[sel.dataset.room].type=sel.value);
+      $$("input[data-k='beds']").forEach(inp=>rooms[inp.dataset.room].beds=parseInt(inp.value||"2",10));
+      $$("input[data-k='notes']").forEach(inp=>rooms[inp.dataset.room].notes=inp.value||"");
+      try{ S.state=await p("save_state",{date:new Date().toISOString().slice(0,10),rooms}); cacheSave(); toast("Enregistré"); }
+      catch(e){ enqueue({action:"save_state", body:{date:new Date().toISOString().slice(0,10),rooms}}); S.state.rooms=rooms; cacheSave(); toast("Enregistré hors-ligne"); }
+    };
+    $("#markArr").onclick=()=>{ const txt=prompt("Liste ARRIVEE (101,102,203)"); if(!txt) return;
+      txt.split(",").map(x=>x.trim()).filter(Boolean).forEach(rn=>{ if(S.state.rooms[rn]) S.state.rooms[rn].status="ARRIVEE"; });
+      render("pms");
+    };
+    $("#markDep").onclick=()=>{ const txt=prompt("Liste DEPART (110,205)"); if(!txt) return;
+      txt.split(",").map(x=>x.trim()).filter(Boolean).forEach(rn=>{ if(S.state.rooms[rn]) S.state.rooms[rn].status="DEPART"; });
+      render("pms");
+    };
+  }
+
+  if(view==="terrain"){
+    const getRoom=()=>$("#trRoom").value.trim();
+    $("#trDone").onclick=()=>{ const rn=getRoom(); if(!rn) return toast("Chambre requise"); location.hash="#pms"; };
+    $("#trVerify").onclick=()=>{ location.hash="#control"; };
+    $("#trTicket").onclick=()=>{ location.hash="#tickets"; if(getRoom()) sessionStorage.setItem("pref_room", getRoom()); };
+    $("#trDefect").onclick=()=>{ location.hash="#defects"; if(getRoom()) sessionStorage.setItem("pref_room", getRoom()); };
+  }
+
+  if(view==="toilets"){
+    $("#wcSave").onclick=async()=>{
+      const entry={at:new Date().toISOString(),zone:$("#wcZone").value,okko:$("#wcOK").value,notes:$("#wcNotes").value.trim(),by:S.session.matricule};
+      try{ await p("append_toilets_log",{entry}); S.toilets=await g("get_toilets_logs").catch(()=>g("get_toilets")); cacheSave(); render("toilets"); }
+      catch(e){ enqueue({action:"append_toilets_log",body:{entry}}); toast("Enregistré hors-ligne"); }
+    };
+  }
+
+  if(view==="tickets"){
+    const pref=sessionStorage.getItem("pref_room")||"";
+    if(pref){ $("#tkRoom").value=pref; sessionStorage.removeItem("pref_room"); }
+    $("#tkCreate").onclick=async()=>{
+      const ticket={room:$("#tkRoom").value.trim(),location:$("#tkLoc").value.trim(),category:$("#tkCat").value,priority:$("#tkPrio").value,desc:$("#tkDesc").value.trim(),status:"OPEN",by:S.session.matricule,assigned_to:$("#tkAsg").value};
+      if(!ticket.location && !ticket.room) return toast("Localisation ou chambre requise");
+      if(!ticket.desc) return toast("Description requise");
+      try{ await p("create_ticket",{ticket}); S.tickets=await g("get_tickets"); cacheSave(); render("tickets"); }
+      catch(e){ enqueue({action:"create_ticket",body:{ticket}}); toast("Enregistré hors-ligne"); }
+    };
+  }
+
+  if(view==="defects"){
+    const pref=sessionStorage.getItem("pref_room")||"";
+    if(pref){ $("#dfRoom").value=pref; sessionStorage.removeItem("pref_room"); }
+    $("#dfCreate").onclick=async()=>{
+      const defect={room:$("#dfRoom").value.trim(),kind:$("#dfKind").value,notes:$("#dfNotes").value.trim(),by:S.session.matricule,status:"OPEN"};
+      if(!defect.room) return toast("Chambre requise");
+      try{ await p("create_defect",{defect}); S.defects=await g("get_defects"); cacheSave(); render("defects"); }
+      catch(e){ enqueue({action:"create_defect",body:{defect}}); toast("Enregistré hors-ligne"); }
+    };
+  }
+
+  if(view==="audits"){
+    $("#auCreate").onclick=async()=>{
+      const audit={kind:$("#auKind").value,room:$("#auRoom").value.trim(),score:parseInt($("#auScore").value||"0",10),notes:$("#auNotes").value.trim(),by:S.session.matricule};
+      if(!audit.room) return toast("Chambre requise");
+      try{ await p("create_audit",{audit}); S.audits=await g("get_audits"); cacheSave(); render("audits"); }
+      catch(e){ enqueue({action:"create_audit",body:{audit}}); toast("Enregistré hors-ligne"); }
+    };
+  }
+
+  if(view==="lostfound"){
+    $("#lfCreate").onclick=async()=>{
+      const item={kind:$("#lfKind").value,where:$("#lfWhere").value.trim(),desc:$("#lfDesc").value.trim(),by:S.session.matricule,sealed:true};
+      if(!item.where||!item.desc) return toast("Lieu + description requis");
+      try{ await p("create_lostfound",{item}); S.lostfound=await g("get_lostfound"); cacheSave(); render("lostfound"); }
+      catch(e){ enqueue({action:"create_lostfound",body:{item}}); toast("Enregistré hors-ligne"); }
+    };
+  }
+
+  if(view==="stocks"){
+    $("#invSave").onclick=async()=>{
+      const inv=structuredClone(S.inventory);
+      $$("input[data-id]").forEach(inp=>{
+        const it=inv.items.find(x=>x.id===inp.dataset.id);
+        if(it) it.stock=parseInt(inp.value||"0",10);
+      });
+      try{ await p("save_inventory",{inventory:inv}); S.inventory=inv; cacheSave(); toast("Stocks enregistrés"); }
+      catch(e){ enqueue({action:"save_inventory",body:{inventory:inv}}); toast("Enregistré hors-ligne"); }
+    };
+  }
+
+  if(view==="requests"){
+    $("#rqCreate").onclick=async()=>{
+      const request={type:$("#rqType").value,room:$("#rqRoom").value.trim(),desc:$("#rqDesc").value.trim(),by:S.session.matricule,status:"OPEN"};
+      if(!request.desc) return toast("Description requise");
+      try{ await p("create_request",{request}); S.requests=await g("get_reception_requests"); cacheSave(); render("requests"); }
+      catch(e){ enqueue({action:"create_request",body:{request}}); toast("Enregistré hors-ligne"); }
+    };
+  }
+
+  if(view==="incidents"){
+    $("#inCreate").onclick=async()=>{
+      const incident={type:$("#inType").value,location:$("#inLoc").value.trim(),desc:$("#inDesc").value.trim(),by:S.session.matricule};
+      if(!incident.location||!incident.desc) return toast("Lieu + détails requis");
+      try{ await p("create_incident",{incident}); S.incidents=await g("get_incidents"); cacheSave(); render("incidents"); }
+      catch(e){ enqueue({action:"create_incident",body:{incident}}); toast("Enregistré hors-ligne"); }
+    };
+  }
+
+  if(view==="groups"){
+    $("#grCreate").onclick=async()=>{
+      const group={name:$("#grName").value.trim(),date:$("#grDate").value,rooms:$("#grRooms").value.split(",").map(x=>x.trim()).filter(Boolean),notes:$("#grNotes").value.trim(),by:S.session.matricule};
+      if(!group.name||!group.date) return toast("Nom + date requis");
+      try{ await p("create_group",{group}); S.groups=await g("get_groups"); cacheSave(); render("groups"); }
+      catch(e){ enqueue({action:"create_group",body:{group}}); toast("Enregistré hors-ligne"); }
+    };
+  }
+
+  if(view==="whatsapp"){
+    $("#waCopy").onclick=async()=>{
+      const rooms=S.state?.rooms||{};
+      const nArr=Object.values(rooms).filter(x=>x.status==="ARRIVEE").length;
+      const nDep=Object.values(rooms).filter(x=>x.status==="DEPART").length;
+      const nUnv=Object.values(rooms).filter(x=>x.status==="ARRIVEE" && !(x.workflow&&x.workflow.verified_by)).length;
+      const urgent=(S.tickets?.tickets||[]).filter(t=>t.priority==="URGENT" && (t.status||"")!=="CLOSED").length;
+      const txt=`Résumé HK (${new Date().toISOString().slice(0,10)})\n• Arrivées: ${nArr} (non validées: ${nUnv})\n• Départs: ${nDep}\n• Tickets urgents: ${urgent}\n• Reworks ouverts: ${(S.defects?.defects||[]).filter(d=>d.status==="OPEN").length}\n`;
+      $("#waText").value=txt;
+      try{ await navigator.clipboard.writeText(txt); toast("Copié"); }catch(e){ toast("Copiez manuellement"); }
+    };
+  }
+
+  if(view==="admin" && isAdmin()){
+    $("#authAdd").onclick=()=>{
+      const m=prompt("Matricule"); if(!m) return;
+      const auth=structuredClone(S.auth||{meta:{},users:[]});
+      auth.users = safeUsers();
+      auth.users.push({matricule:m,name:"",role:"FC",pin:"",active:true});
+      S.auth=auth; cacheSave(); render("admin");
+    };
+    $("#authSave").onclick=async()=>{
+      const auth=structuredClone(S.auth||{meta:{},users:[]});
+      auth.users = safeUsers().map(u=>({...u}));
+      auth.users.forEach(u=>{
+        const m=u.matricule;
+        const name=$(`input[data-u="${m}"][data-k="name"]`); if(name) u.name=name.value;
+        const role=$(`select[data-u="${m}"][data-k="role"]`); if(role) u.role=role.value;
+        const pin=$(`input[data-u="${m}"][data-k="pin"]`); if(pin) u.pin=pin.value;
+        const act=$(`select[data-u="${m}"][data-k="active"]`); if(act) u.active=(act.value==="true");
+      });
+      try{ await p("save_auth",{auth}); S.auth=auth; cacheSave(); toast("Utilisateurs enregistrés"); }
+      catch(e){ enqueue({action:"save_auth",body:{auth}}); toast("Enregistré hors-ligne"); }
+    };
+  }
+}
+
+function mount(viewId){
+  renderNav(viewId);
+  const root=$("#app");
+  if(!S.session){
+    root.innerHTML=loginView();
+    $("#btnLogin").onclick=async()=>{
+      try{
+        const u=await p("login",{matricule:$("#mat").value.trim(),pin:$("#pin").value.trim()});
+        saveSession(u); toast("Bienvenue"); location.hash="#home"; await loadAll(true);
+      }catch(e){ toast(e.message); }
+    };
+    return;
+  }
+  root.innerHTML = viewRouter(viewId);
+  bind(viewId);
+}
+
+async function loadAll(force){
+  const c=cacheLoad();
+  if(c && !force) Object.assign(S,c);
+  try{
+    // always try sync queue first
+    await syncQueue();
+    S.settings=await g("get_settings");
+    S.rooms=await g("get_rooms");
+    S.state=await g("get_current_state").catch(()=>g("get_current_state"));
+    S.toilets=await g("get_toilets_logs").catch(()=>g("get_toilets"));
+    S.tickets=await g("get_tickets");
+    S.lostfound=await g("get_lostfound");
+    S.audits=await g("get_audits");
+    S.auth=await g("get_auth").catch(()=>S.auth);
+    S.defects=await g("get_defects").catch(()=>S.defects);
+    S.requests=await g("get_reception_requests").catch(()=>S.requests);
+    S.inventory=await g("get_inventory").catch(()=>S.inventory);
+    S.incidents=await g("get_incidents").catch(()=>S.incidents);
+    S.groups=await g("get_groups").catch(()=>S.groups);
+    cacheSave();
+    $("#sub").textContent = "Prêt";
+  }catch(e){
+    $("#sub").textContent = "Mode hors‑ligne (cache)";
+  }
+  const lb=$("#logo");
+  if(lb && !lb.innerHTML) lb.innerHTML=`<img src="assets/logo.png" alt="logo" onerror="this.style.display='none'">`;
+  const view=(location.hash||"#home").slice(1);
+  mount(view||"home");
+}
+
+window.addEventListener("hashchange", ()=>{
+  const view=(location.hash||"#home").slice(1);
+  mount(view||"home");
+});
+
+(async()=>{
+  const cached=cacheLoad(); if(cached) Object.assign(S,cached);
+  S.session=loadSession();
+  if(!S.session){
+    renderNav("home");
+    $("#app").innerHTML=loginView();
+    $("#btnLogin").onclick=async()=>{
+      try{
+        const u=await p("login",{matricule:$("#mat").value.trim(),pin:$("#pin").value.trim()});
+        saveSession(u); toast("Bienvenue"); location.hash="#home"; await loadAll(true);
+      }catch(e){ toast(e.message); }
+    };
+  }else{
+    await loadAll(false);
+  }
+})();
+
+// Auto-refresh (quasi temps réel)
+setInterval(()=>{ if(S.session){ loadAll(true).catch(()=>{}); } }, 15000);
+
+// SW
+if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js").catch(()=>{});}
+</script>
+</body>
+</html>
